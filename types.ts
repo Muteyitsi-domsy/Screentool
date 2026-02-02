@@ -25,6 +25,11 @@ export enum ExportMode {
   FRAME = 'FRAME'
 }
 
+export enum AppView {
+  EDITOR = 'EDITOR',
+  TRAY = 'TRAY'
+}
+
 export interface CropArea {
   x: number; // Percentage 0-100
   y: number; // Percentage 0-100
@@ -49,6 +54,18 @@ export interface DeviceSpec {
   isTablet?: boolean;
 }
 
+export interface TrayItem {
+  id: string;
+  renderedImageUrl: string; // Pre-rendered immutable preview
+  renderedBlob: Blob;       // High-res immutable export asset
+  platform: Platform;
+  deviceType: DeviceType;
+  exportMode: ExportMode;
+  index: number;            // 1-4 slot assignment
+  filename: string;         // Precomputed naming convention
+  timestamp: number;
+}
+
 export interface ProcessingState {
   image: string | null;
   fitMode: FitMode;
@@ -56,4 +73,6 @@ export interface ProcessingState {
   selectedDevice: DeviceType;
   cropArea: CropArea;
   adjustments: ImageAdjustments;
+  activeView: AppView;
+  tray: (TrayItem | null)[];
 }

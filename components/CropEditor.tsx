@@ -1,17 +1,24 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { CropArea } from '../types';
+import { CropArea, FitMode } from '../types';
 
 interface CropEditorProps {
   image: string;
   cropArea: CropArea;
+  fitMode: FitMode;
+  onFitChange: (mode: FitMode) => void;
   onCropChange: (crop: CropArea) => void;
   onClose: () => void;
 }
 
-const ZOOM_LEVELS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
-
-const CropEditor: React.FC<CropEditorProps> = ({ image, cropArea, onCropChange, onClose }) => {
+const CropEditor: React.FC<CropEditorProps> = ({ 
+  image, 
+  cropArea, 
+  fitMode, 
+  onFitChange, 
+  onCropChange, 
+  onClose 
+}) => {
   const workspaceRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   
@@ -52,7 +59,7 @@ const CropEditor: React.FC<CropEditorProps> = ({ image, cropArea, onCropChange, 
 
   const autoFitScale = useMemo(() => {
     if (workspaceSize.w === 0 || workspaceSize.h === 0) return 1;
-    const safety = 120;
+    const safety = 140; // Increased for extra controls
     const scaleX = (workspaceSize.w - safety) / BASE_WIDTH;
     const scaleY = (workspaceSize.h - safety) / BASE_HEIGHT;
     return Math.max(0.2, Math.min(scaleX, scaleY, 2.5));
@@ -157,23 +164,46 @@ const CropEditor: React.FC<CropEditorProps> = ({ image, cropArea, onCropChange, 
 
   return (
     <div className="w-full h-full flex flex-col bg-[#050505] overflow-hidden select-none">
-      <div className="px-6 py-4 md:px-10 md:py-6 border-b border-zinc-800/50 flex flex-col lg:flex-row items-center justify-between gap-4 bg-zinc-900/20 backdrop-blur-3xl shrink-0 z-50">
-        <div>
+      <div className="px-6 py-4 md:px-10 md:py-6 border-b border-zinc-800/50 flex flex-col lg:flex-row items-center justify-between gap-6 bg-zinc-900/20 backdrop-blur-3xl shrink-0 z-50">
+        <div className="hidden sm:block">
           <h3 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase italic leading-none">Canonical Precision</h3>
           <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] mt-2">WYSIWYG Asset Editor</p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Sync Scaling Logic Control */}
+        <div className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800 w-full lg:w-auto">
+          <button 
+            onClick={() => onFitChange(FitMode.FIT)}
+            className={`flex-1 lg:flex-none px-6 py-2 text-[9px] font-black rounded-xl transition-all ${fitMode === FitMode.FIT ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            FIT
+          </button>
+          <button 
+            onClick={() => onFitChange(FitMode.AUTOFIT)}
+            className={`flex-1 lg:flex-none px-6 py-2 text-[9px] font-black rounded-xl transition-all ${fitMode === FitMode.AUTOFIT ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            FILL
+          </button>
+          <button 
+            onClick={() => onFitChange(FitMode.STRETCH)}
+            className={`flex-1 lg:flex-none px-6 py-2 text-[9px] font-black rounded-xl transition-all ${fitMode === FitMode.STRETCH ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            STRETCH
+          </button>
+        </div>
+
+        <div className="flex gap-2 w-full lg:w-auto">
           <button 
             onClick={() => { setLocalCrop({ x: 0, y: 0, width: 100, height: 100 }); setManualZoom(null); setPan({x:0, y:0}); }} 
-            className="px-5 py-2.5 text-[10px] font-black text-zinc-400 hover:text-white transition-all bg-zinc-900 border border-zinc-800 rounded-2xl"
+            className="flex-1 lg:flex-none px-5 py-2.5 text-[10px] font-black text-zinc-400 hover:text-white transition-all bg-zinc-900 border border-zinc-800 rounded-2xl"
           >
             RESET
           </button>
           <button 
             onClick={() => { onCropChange(localCrop); onClose(); }} 
-            className="px-8 py-2.5 text-[10px] font-black bg-white text-black rounded-2xl transition-all shadow-2xl active:scale-95 hover:bg-blue-50"
+            className="flex-1 lg:flex-none px-8 py-2.5 text-[10px] font-black bg-white text-black rounded-2xl transition-all shadow-2xl active:scale-95 hover:bg-blue-50"
           >
-            APPLY CROP
+            APPLY
           </button>
         </div>
       </div>
@@ -192,12 +222,13 @@ const CropEditor: React.FC<CropEditorProps> = ({ image, cropArea, onCropChange, 
               <img 
                 src={image} 
                 alt="Subject" 
-                className="absolute pointer-events-none max-w-none origin-top-left"
+                className="absolute pointer-events-none max-w-none origin-top-left transition-all"
                 style={{
                   width: `${100 / (localCrop.width / 100)}%`,
                   height: `${100 / (localCrop.height / 100)}%`,
                   left: `-${localCrop.x * (100 / localCrop.width)}%`,
                   top: `-${localCrop.y * (100 / localCrop.height)}%`,
+                  objectFit: fitMode === FitMode.FIT ? 'contain' : fitMode === FitMode.STRETCH ? 'fill' : 'cover'
                 }}
               />
             </div>

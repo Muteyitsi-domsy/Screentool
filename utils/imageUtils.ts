@@ -1,8 +1,8 @@
 
-import { DeviceSpec, FitMode, ExportMode, CropArea, ImageAdjustments } from '../types';
+import { DeviceSpec, FitMode, ExportMode, CropArea, ImageAdjustments, Platform } from '../types';
 
 /**
- * Detects solid color borders in an image.
+ * Detects solid color borders in an image to normalize screenshots.
  */
 export const detectBorders = (img: HTMLImageElement): CropArea => {
   const canvas = document.createElement('canvas');
@@ -50,13 +50,21 @@ export const detectBorders = (img: HTMLImageElement): CropArea => {
   };
 };
 
+/**
+ * Applies unsharp mask convolution for professional asset sharpness.
+ */
 const applySharpness = (ctx: CanvasRenderingContext2D, width: number, height: number, amount: number) => {
   if (amount <= 0) return;
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
   const output = new Uint8ClampedArray(data.length);
+  
   const a = amount / 300; 
-  const kernel = [0, -a, 0, -a, 1 + 4 * a, -a, 0, -a, 0];
+  const kernel = [
+    0, -a, 0,
+    -a, 1 + 4 * a, -a,
+    0, -a, 0
+  ];
 
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
@@ -94,41 +102,100 @@ export const processImage = async (
     img.onload = () => {
       canvas.width = spec.width;
       canvas.height = spec.height;
-      ctx.fillStyle = "#050505";
+
+      const isApple = spec.platform === Platform.APPLE;
+      const bgColor = "#050505";
+      
+      // Background Rendering
+      if (exportMode === ExportMode.FRAME) {
+        const bgGrad = ctx.createLinearGradient(0, 0, spec.width, spec.height);
+        bgGrad.addColorStop(0, "#111111");
+        bgGrad.addColorStop(1, "#000000");
+        ctx.fillStyle = bgGrad;
+      } else {
+        ctx.fillStyle = bgColor;
+      }
       ctx.fillRect(0, 0, spec.width, spec.height);
 
-      // --- INVARIANT: Shared Viewport Logic ---
-      // Both RECT and FRAME share the same canonical content bounds.
-      // The only difference is the visual shell drawn around it.
-      const framePadding = spec.width * 0.12;
-      const targetX = framePadding;
-      const targetY = framePadding;
-      const targetW = spec.width - framePadding * 2;
-      const targetH = spec.height - framePadding * 2;
+      let targetX = 0;
+      let targetY = 0;
+      let targetW = spec.width;
+      let targetH = spec.height;
 
-      // Draw Device Shell if requested
+      // Hardware Frame Logic
       if (exportMode === ExportMode.FRAME) {
-        const bezel = spec.width * 0.04;
-        const bodyX = targetX - bezel, bodyY = targetY - bezel, bodyW = targetW + bezel * 2, bodyH = targetH + bezel * 2;
+        const framePadding = spec.width * 0.12;
+        targetX = framePadding;
+        targetY = framePadding;
+        targetW = spec.width - framePadding * 2;
+        targetH = spec.height - framePadding * 2;
+
+        const bezelWidth = spec.width * 0.04;
+        const bodyX = targetX - bezelWidth;
+        const bodyY = targetY - bezelWidth;
+        const bodyW = targetW + bezelWidth * 2;
+        const bodyH = targetH + bezelWidth * 2;
         const bodyRadius = spec.isTablet ? spec.width * 0.05 : spec.width * 0.1;
 
+        // Shadow
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = spec.width * 0.1;
-        ctx.shadowOffsetY = spec.width * 0.05;
-        
-        const chassisGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX, bodyY + bodyH);
-        chassisGrad.addColorStop(0, '#1a1a1a');
-        chassisGrad.addColorStop(1, '#050505');
-        ctx.fillStyle = chassisGrad;
-
+        ctx.shadowOffsetY = spec.width * 0.04;
         ctx.beginPath();
         ctx.roundRect(bodyX, bodyY, bodyW, bodyH, bodyRadius);
         ctx.fill();
         ctx.restore();
+
+        // Chassis
+        const chassisGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY);
+        chassisGrad.addColorStop(0, '#1a1a1a');
+        chassisGrad.addColorStop(0.5, '#333333');
+        chassisGrad.addColorStop(1, '#1a1a1a');
+        
+        ctx.fillStyle = chassisGrad;
+        ctx.beginPath();
+        ctx.roundRect(bodyX, bodyY, bodyW, bodyH, bodyRadius);
+        ctx.fill();
+
+        // Rim Highlight
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = spec.width * 0.005;
+        ctx.stroke();
+
+        // Platform-Specific hardware details
+        if (!spec.isTablet && spec.width < spec.height) {
+          if (isApple) {
+             const islandW = bodyW * 0.22;
+             const islandH = bodyH * 0.018;
+             const islandX = bodyX + (bodyW - islandW) / 2;
+             const islandY = bodyY + (bodyH * 0.024);
+             ctx.fillStyle = '#000';
+             ctx.beginPath();
+             ctx.roundRect(islandX, islandY, islandW, islandH, islandH / 2);
+             ctx.fill();
+          } else {
+             const notchSize = bodyW * 0.05;
+             const notchX = bodyX + (bodyW - notchSize) / 2;
+             const notchY = bodyY + (bodyH * 0.024);
+             ctx.fillStyle = '#0a0a0a';
+             ctx.beginPath();
+             ctx.arc(notchX + notchSize/2, notchY + notchSize/2, notchSize/2, 0, Math.PI * 2);
+             ctx.fill();
+          }
+        }
+      } else {
+        // Subtle inset for RECTANGLE mode on Apple to maintain compliance branding
+        if (isApple && fitMode === FitMode.FIT) {
+          const appleBreathingRoom = spec.width * 0.04; 
+          targetX += appleBreathingRoom;
+          targetY += appleBreathingRoom;
+          targetW -= appleBreathingRoom * 2;
+          targetH -= appleBreathingRoom * 2;
+        }
       }
 
-      // Draw Canonical Viewport Content
+      // Canonical content processing
       const sx = (cropArea.x / 100) * img.width;
       const sy = (cropArea.y / 100) * img.height;
       const sw = (cropArea.width / 100) * img.width;
@@ -137,7 +204,10 @@ export const processImage = async (
       const imgRatio = sw / sh;
       const targetRatio = targetW / targetH;
 
-      let drawW = targetW, drawH = targetH, drawX = targetX, drawY = targetY;
+      let drawW = targetW;
+      let drawH = targetH;
+      let drawX = targetX;
+      let drawY = targetY;
 
       if (fitMode === FitMode.FIT) {
         if (imgRatio > targetRatio) {
@@ -158,11 +228,15 @@ export const processImage = async (
       }
 
       ctx.save();
-      const screenRadius = spec.isTablet ? spec.width * 0.04 : spec.width * 0.08;
-      ctx.beginPath();
-      ctx.roundRect(targetX, targetY, targetW, targetH, screenRadius);
-      ctx.clip();
+      // Screen masking for FRAME mode
+      if (exportMode === ExportMode.FRAME) {
+        const screenRadius = spec.isTablet ? spec.width * 0.04 : spec.width * 0.08;
+        ctx.beginPath();
+        ctx.roundRect(targetX, targetY, targetW, targetH, screenRadius);
+        ctx.clip();
+      }
       
+      // Apply filters and draw image
       ctx.filter = `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
       ctx.drawImage(img, sx, sy, sw, sh, drawX, drawY, drawW, drawH);
       

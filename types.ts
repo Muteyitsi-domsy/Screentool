@@ -61,7 +61,7 @@ export interface TrayItem {
   platform: Platform;
   deviceType: DeviceType;
   exportMode: ExportMode;
-  index: number;            // 1-4 slot assignment
+  index: number;            // 1-8 slot assignment
   filename: string;         // Precomputed naming convention
   timestamp: number;
 }

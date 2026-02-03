@@ -41,7 +41,7 @@ const App: React.FC = () => {
     cropArea: { x: 0, y: 0, width: 100, height: 100 },
     adjustments: { ...NEUTRAL_BASELINE },
     activeView: AppView.EDITOR,
-    tray: [null, null, null, null]
+    tray: Array(8).fill(null)
   });
   
   const [isExporting, setIsExporting] = useState<Platform | null>(null);
@@ -228,15 +228,20 @@ const App: React.FC = () => {
   };
 
   const removeFromTray = (index: number) => {
-    setState(prev => {
-      const item = prev.tray[index];
-      if (item) {
-        URL.revokeObjectURL(item.renderedImageUrl);
-      }
-      const newTray = [...prev.tray];
-      newTray[index] = null;
-      return { ...prev, tray: newTray };
-    });
+    const item = state.tray[index];
+    if (!item) return;
+
+    if (window.confirm(`Are you sure you want to remove this snapshot from the tray?`)) {
+      setState(prev => {
+        const currentItem = prev.tray[index];
+        if (currentItem) {
+          URL.revokeObjectURL(currentItem.renderedImageUrl);
+        }
+        const newTray = [...prev.tray];
+        newTray[index] = null;
+        return { ...prev, tray: newTray };
+      });
+    }
   };
 
   /**
@@ -515,7 +520,7 @@ const App: React.FC = () => {
             <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-bold text-zinc-400">Captured Shots</span>
-                <span className="text-[10px] font-mono text-white">{state.tray.filter(x => x !== null).length}/4</span>
+                <span className="text-[10px] font-mono text-white">{state.tray.filter(x => x !== null).length}/8</span>
               </div>
               <p className="text-[9px] text-zinc-600 leading-relaxed font-bold uppercase tracking-widest">
                 Export uses pre-rendered snapshots for 100% editor parity.
@@ -575,7 +580,11 @@ const App: React.FC = () => {
                   />
                   {state.image && (
                     <button 
-                      onClick={() => setState(prev => ({ ...prev, image: null }))}
+                      onClick={() => {
+                        if (window.confirm("Are you sure you want to discard the current master screenshot and all edits?")) {
+                          setState(prev => ({ ...prev, image: null }));
+                        }
+                      }}
                       className="absolute -top-6 -right-6 w-12 h-12 bg-zinc-900 hover:bg-red-600 rounded-full flex items-center justify-center text-zinc-600 hover:text-white border border-zinc-800 shadow-2xl transition-all group active:scale-90"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>

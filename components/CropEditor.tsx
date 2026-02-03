@@ -194,7 +194,13 @@ const CropEditor: React.FC<CropEditorProps> = ({
 
         <div className="flex gap-2 w-full lg:w-auto">
           <button 
-            onClick={() => { setLocalCrop({ x: 0, y: 0, width: 100, height: 100 }); setManualZoom(null); setPan({x:0, y:0}); }} 
+            onClick={() => { 
+              if (window.confirm("Discard all precision crop adjustments and return to the master frame?")) {
+                setLocalCrop({ x: 0, y: 0, width: 100, height: 100 }); 
+                setManualZoom(null); 
+                setPan({x:0, y:0}); 
+              }
+            }} 
             className="flex-1 lg:flex-none px-5 py-2.5 text-[10px] font-black text-zinc-400 hover:text-white transition-all bg-zinc-900 border border-zinc-800 rounded-2xl"
           >
             RESET

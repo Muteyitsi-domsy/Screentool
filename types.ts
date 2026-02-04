@@ -64,6 +64,7 @@ export interface TrayItem {
   index: number;            // 1-8 slot assignment
   filename: string;         // Precomputed naming convention
   timestamp: number;
+  frameColor: string;       // Hex code of the hardware finish
 }
 
 export interface ProcessingState {
@@ -71,6 +72,7 @@ export interface ProcessingState {
   fitMode: FitMode;
   exportMode: ExportMode;
   selectedDevice: DeviceType;
+  frameColor: string;       // Active editor hardware finish
   cropArea: CropArea;
   adjustments: ImageAdjustments;
   activeView: AppView;

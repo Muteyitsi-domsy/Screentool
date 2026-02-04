@@ -1,7 +1,7 @@
 
-import React from 'react';
-import { DeviceType, ExportMode, FitMode, CropArea, ImageAdjustments } from '../types';
-import { DEVICE_SPECS } from '../constants';
+import React, { useState } from 'react';
+import { DeviceType, ExportMode, FitMode, CropArea, ImageAdjustments, Platform } from '../types';
+import { DEVICE_SPECS, FRAME_COLORS } from '../constants';
 
 interface DeviceMockupProps {
   deviceType: DeviceType;
@@ -10,6 +10,8 @@ interface DeviceMockupProps {
   fitMode: FitMode;
   cropArea: CropArea;
   adjustments: ImageAdjustments;
+  frameColor: string;
+  onColorChange?: (hex: string) => void;
 }
 
 const DeviceMockup: React.FC<DeviceMockupProps> = ({
@@ -19,14 +21,17 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   fitMode,
   cropArea,
   adjustments,
+  frameColor,
+  onColorChange,
 }) => {
   const spec = DEVICE_SPECS[deviceType];
   const isLandscape = spec.width > spec.height;
   const isTablet = spec.isTablet;
+  const [showPicker, setShowPicker] = useState(false);
   
   const maxW = 320;
   const maxH = 500;
-  let previewW, previewH;
+  let previewW: number, previewH: number;
 
   if (isLandscape) {
     previewW = maxW;
@@ -36,7 +41,6 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
     previewW = (spec.width / spec.height) * maxH;
   }
 
-  // Viewport Padding Scale (Must match imageUtils.ts framePadding)
   const VIEWPORT_PADDING_FACTOR = 0.12;
   const paddingX = previewW * VIEWPORT_PADDING_FACTOR;
   const paddingY = previewH * VIEWPORT_PADDING_FACTOR;
@@ -44,13 +48,10 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   const containerStyle = {
     width: `${previewW}px`,
     height: `${previewH}px`,
-    backgroundColor: '#050505',
     padding: `${paddingY}px ${paddingX}px`,
   };
 
-  const frameBorderClass = exportMode === ExportMode.FRAME 
-    ? `ring-[12px] ring-zinc-800 ring-inset ${isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]'}`
-    : "rounded shadow-lg";
+  const isMockup = exportMode === ExportMode.FRAME;
 
   const getObjectFit = () => {
     switch (fitMode) {
@@ -62,13 +63,35 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   };
 
   const filterString = `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
+  const availableColors = FRAME_COLORS[spec.platform];
 
   return (
-    <div className="flex flex-col items-center justify-center p-10 bg-zinc-900/30 rounded-[3rem] border border-zinc-800/50 backdrop-blur-xl">
+    <div className="flex flex-col items-center justify-center p-10 bg-zinc-900/30 rounded-[3rem] border border-zinc-800/50 backdrop-blur-xl group/mockup">
       <div 
-        style={containerStyle} 
-        className={`${frameBorderClass} transition-all duration-300 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl`}
+        style={{
+          ...containerStyle,
+          backgroundColor: isMockup ? frameColor : '#050505'
+        }} 
+        className={`transition-all duration-500 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl ${isMockup ? (isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]') : 'rounded shadow-lg'} ${isMockup ? 'ring-[12px] ring-zinc-800/30 ring-inset cursor-pointer hover:ring-blue-500/20' : ''}`}
+        onClick={() => isMockup && setShowPicker(!showPicker)}
       >
+        {isMockup && (
+          <div 
+            className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 transition-all duration-300 z-50 ${showPicker ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 translate-y-4 pointer-events-none'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+             {availableColors.map(c => (
+               <button
+                 key={c.hex}
+                 onClick={() => { onColorChange?.(c.hex); setShowPicker(false); }}
+                 className={`w-4 h-4 rounded-full border border-white/20 transition-all hover:scale-125 hover:shadow-[0_0_10px_rgba(255,255,255,0.2)] ${frameColor === c.hex ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black' : ''}`}
+                 style={{ backgroundColor: c.hex }}
+                 title={c.name}
+               />
+             ))}
+          </div>
+        )}
+
         {image ? (
           <div className={`w-full h-full relative overflow-hidden transition-all duration-500 ${isTablet ? 'rounded-[0.8rem]' : 'rounded-[1.8rem]'}`}>
             <img 
@@ -99,9 +122,12 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
             <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-80 italic">
               {spec.name}
             </span>
+            {isMockup && (
+              <span className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">• {availableColors.find(c => c.hex === frameColor)?.name} Finish</span>
+            )}
          </div>
          <span className="text-zinc-600 text-[9px] font-mono tracking-tighter uppercase">
-           Canonical Standards Enabled
+           {isMockup ? 'Click Frame to Switch Hardware Finish' : 'Canonical Standards Enabled'}
          </span>
       </div>
     </div>

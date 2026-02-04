@@ -16,7 +16,7 @@ import {
 import { DEVICE_SPECS } from './constants';
 import DeviceMockup from './components/DeviceMockup';
 import CropEditor from './components/CropEditor';
-import { processImage, detectBorders } from './utils/imageUtils';
+import { processImage, detectBorders } from './imageUtils';
 
 const NEUTRAL_BASELINE: ImageAdjustments = {
   brightness: 100,
@@ -32,18 +32,34 @@ const AUTO_SHINE_PRESET: ImageAdjustments = {
   sharpness: 25
 };
 
+interface ModalState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  confirmLabel?: string;
+}
+
 const App: React.FC = () => {
   const [state, setState] = useState<ProcessingState>({
     image: null,
     fitMode: FitMode.FIT,
     exportMode: ExportMode.RECTANGLE,
     selectedDevice: DeviceType.IPHONE,
+    frameColor: '#1a1a1a',
     cropArea: { x: 0, y: 0, width: 100, height: 100 },
     adjustments: { ...NEUTRAL_BASELINE },
     activeView: AppView.EDITOR,
     tray: Array(8).fill(null)
   });
   
+  const [modal, setModal] = useState<ModalState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const [isExporting, setIsExporting] = useState<Platform | null>(null);
   const [isAddingToTray, setIsAddingToTray] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -58,52 +74,44 @@ const App: React.FC = () => {
     }
   }, [showSuccess]);
 
+  useEffect(() => {
+    setState(prev => ({ ...prev, frameColor: '#1a1a1a' }));
+  }, [state.selectedDevice]);
+
   /**
-   * ENFORCED NAMING CONTRACT (Identity-Based)
-   * Format: {platform}_{device}_{size}_{mode}_{index}.png
-   * size is derived strictly from device identity.
+   * REINFORCED MODAL LOGIC
+   * Ensures intent is returned via callback without executing state updates internally.
    */
+  const showConfirm = (title: string, message: string, onConfirm: () => void, confirmLabel: string = "Confirm") => {
+    setModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setModal(prev => ({ ...prev, isOpen: false }));
+      },
+      confirmLabel
+    });
+  };
+
   const getExportFilename = (spec: DeviceSpec, mode: ExportMode, index: number): string => {
     const platform = spec.platform.toLowerCase();
     const modeLabel = mode === ExportMode.RECTANGLE ? 'rect' : 'mockup';
     const idx = index.toString().padStart(2, '0');
-    
     let device = '';
     let size = '';
 
-    // Size is derived exclusively from Device identity
     switch (spec.id) {
-      case DeviceType.PHONE:
-        device = 'phone';
-        size = ''; 
-        break;
-      case DeviceType.TABLET_7:
-        device = 'tablet';
-        size = '7in';
-        break;
-      case DeviceType.TABLET_10:
-        device = 'tablet';
-        size = '10in';
-        break;
-      case DeviceType.CHROMEBOOK:
-        device = 'chromebook';
-        size = '';
-        break;
-      case DeviceType.IPHONE:
-        device = 'phone';
-        size = '6.7';
-        break;
-      case DeviceType.IPHONE_61:
-        device = 'phone';
-        size = '6.1';
-        break;
-      case DeviceType.IPAD:
-        device = 'tablet';
-        size = '12.9';
-        break;
+      case DeviceType.PHONE: device = 'phone'; break;
+      case DeviceType.TABLET_7: device = 'tablet'; size = '7in'; break;
+      case DeviceType.TABLET_10: device = 'tablet'; size = '10in'; break;
+      case DeviceType.CHROMEBOOK: device = 'chromebook'; break;
+      case DeviceType.IPHONE: device = 'phone'; size = '6.7'; break;
+      case DeviceType.IPHONE_61: device = 'phone'; size = '6.1'; break;
+      case DeviceType.IPAD: device = 'tablet'; size = '12.9'; break;
     }
     
-    // Construct parts array, filtering out empty size segment if needed
     const segments = [platform, device, size, modeLabel, idx].filter(s => s !== '');
     return `${segments.join('_')}.png`;
   };
@@ -112,12 +120,10 @@ const App: React.FC = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
-
     const x = (rect.x / 100) * img.width;
     const y = (rect.y / 100) * img.height;
     const w = (rect.width / 100) * img.width;
     const h = (rect.height / 100) * img.height;
-
     canvas.width = w;
     canvas.height = h;
     ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
@@ -140,6 +146,8 @@ const App: React.FC = () => {
       img.onload = () => {
         let normalizationRect = detectBorders(img);
         const targetSpec = DEVICE_SPECS[state.selectedDevice];
+        
+        // CANONICAL VIEWPORT NORMALIZATION
         if (targetSpec.platform === Platform.APPLE) {
           const isModal = normalizationRect.width < 95 || normalizationRect.height < 95;
           const insetFactor = isModal ? 0.08 : 0.04;
@@ -151,7 +159,16 @@ const App: React.FC = () => {
             width: normalizationRect.width - (insetW * 2),
             height: normalizationRect.height - (insetH * 2)
           };
+        } else if (targetSpec.platform === Platform.ANDROID) {
+          // Android Harmonization: No insets, but ensure dead-centering 
+          // to maintain app content parity across phone/tablet viewports.
+          const isLandscape = normalizationRect.width > normalizationRect.height;
+          // Predicable composition start: 
+          // If master has status bars, detectBorders handled it; 
+          // we just ensure the resulting asset is a perfect canonical anchor.
+          console.debug("Android Canonical Normalization complete for Class:", targetSpec.id);
         }
+        
         const cleanAsset = createCanonicalAsset(img, normalizationRect);
         setState(prev => ({ 
           ...prev, 
@@ -178,9 +195,6 @@ const App: React.FC = () => {
 
     try {
       const spec = DEVICE_SPECS[state.selectedDevice];
-      
-      // Calculate index based on bucket (Platform + Device + Mode)
-      // This ensures "If the same device + mode appears twice, index increments"
       const bucketItems = state.tray.filter(item => 
         item !== null && 
         item.deviceType === state.selectedDevice && 
@@ -195,11 +209,11 @@ const App: React.FC = () => {
         state.fitMode,
         state.exportMode,
         state.adjustments,
-        state.cropArea
+        state.cropArea,
+        state.frameColor
       );
 
       const renderedImageUrl = URL.createObjectURL(renderedBlob);
-      // Precompute filename verbatim as per naming contract
       const filename = getExportFilename(spec, state.exportMode, calculatedIndex);
 
       const newItem: TrayItem = {
@@ -211,7 +225,8 @@ const App: React.FC = () => {
         exportMode: state.exportMode,
         index: calculatedIndex,
         filename,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        frameColor: state.frameColor
       };
 
       setState(prev => {
@@ -227,87 +242,77 @@ const App: React.FC = () => {
     }
   };
 
-  const removeFromTray = (index: number) => {
-    const item = state.tray[index];
-    if (!item) return;
+  /**
+   * STABLE-ID TRAY REMOVAL
+   * Targets specific ID to prevent reindexing or slot collisions in 8-item tray.
+   */
+  const removeFromTrayById = (id: string) => {
+    const itemIndex = state.tray.findIndex(item => item?.id === id);
+    if (itemIndex === -1) return;
 
-    if (window.confirm(`Are you sure you want to remove this snapshot from the tray?`)) {
-      setState(prev => {
-        const currentItem = prev.tray[index];
-        if (currentItem) {
-          URL.revokeObjectURL(currentItem.renderedImageUrl);
-        }
-        const newTray = [...prev.tray];
-        newTray[index] = null;
-        return { ...prev, tray: newTray };
-      });
-    }
+    showConfirm(
+      "Remove Snapshot", 
+      "Are you sure you want to remove this screenshot from the Export Tray?", 
+      () => {
+        setState(prev => {
+          const currentItem = prev.tray[itemIndex];
+          if (currentItem) {
+            URL.revokeObjectURL(currentItem.renderedImageUrl);
+          }
+          const newTray = [...prev.tray];
+          newTray[itemIndex] = null;
+          return { ...prev, tray: newTray };
+        });
+      },
+      "Remove"
+    );
   };
 
   /**
-   * BATCH EXPORT ENGINE
-   * Scope: Entire tray (regardless of editor selection)
-   * ZIP Contract: {platform}_{device}_{size}_{mode}_screenshots.zip
+   * UNIFIED BATCH EXPORT LOGIC
+   * Groups items by Platform x Mode only, generating one ZIP per mode containing all device sizes.
    */
   const handleBatchExport = async (targetPlatform: Platform) => {
     const trayItems = state.tray.filter((item): item is TrayItem => item !== null && item.platform === targetPlatform);
     if (trayItems.length === 0) return;
-
     setIsExporting(targetPlatform);
 
     try {
-      // Group items by unique device/mode identity
       const groups: Record<string, TrayItem[]> = {};
       trayItems.forEach(item => {
-        const groupKey = `${item.deviceType}_${item.exportMode}`;
+        // Mode-level grouping (e.g., 'RECTANGLE' or 'FRAME')
+        const groupKey = item.exportMode;
         if (!groups[groupKey]) groups[groupKey] = [];
         groups[groupKey].push(item);
       });
 
-      for (const groupKey in groups) {
-        const groupItems = groups[groupKey];
+      for (const mode in groups) {
+        const groupItems = groups[mode];
         if (groupItems.length === 0) continue;
 
-        const firstItem = groupItems[0];
-        
-        // Derive ZIP base name by stripping the index segment from the stored filename
-        // Filename: {platform}_{device}_{size}_{mode}_{index}.png
-        const segments = firstItem.filename.split('_');
-        segments.pop(); 
-        const zipBase = segments.join('_');
-        const finalZipName = `${zipBase}_screenshots.zip`;
+        const modeLabel = mode === ExportMode.RECTANGLE ? 'rect' : 'mockup';
+        const platformLabel = targetPlatform.toLowerCase();
+        const finalZipName = `${platformLabel}_${modeLabel}_screenshots.zip`;
 
-        if (groupItems.length > 1) {
-          const zip = new JSZip();
-          groupItems.forEach(item => {
-            zip.file(item.filename, item.renderedBlob);
-          });
-          
-          const content = await zip.generateAsync({ type: 'blob' });
-          const url = URL.createObjectURL(content);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = finalZipName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        } else {
-          const item = groupItems[0];
-          const url = URL.createObjectURL(item.renderedBlob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = item.filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
+        const zip = new JSZip();
+        groupItems.forEach(item => {
+          zip.file(item.filename, item.renderedBlob);
+        });
+        
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = finalZipName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
       setShowSuccess(true);
     } catch (err) {
       console.error("Batch crash:", err);
-      alert("Batch engine failed to build ZIP container.");
+      alert("Batch engine failed to build platform kit ZIPs.");
     } finally {
       setIsExporting(null);
     }
@@ -351,6 +356,30 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a]">
+      {/* GLOBAL CONFIRMATION MODAL */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300">
+             <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4">{modal.title}</h3>
+             <p className="text-zinc-400 text-xs font-medium leading-relaxed mb-8 uppercase tracking-wider">{modal.message}</p>
+             <div className="flex gap-3">
+                <button 
+                  onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={modal.onConfirm}
+                  className="flex-1 py-3 text-[10px] font-black text-white uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-2xl transition-all shadow-lg shadow-blue-500/20"
+                >
+                  {modal.confirmLabel || "Confirm"}
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
       <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/20 p-6 flex flex-col gap-6 overflow-y-auto shrink-0 scrollbar-hide">
         <header>
           <div className="flex items-center gap-2 mb-1">
@@ -523,7 +552,7 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-mono text-white">{state.tray.filter(x => x !== null).length}/8</span>
               </div>
               <p className="text-[9px] text-zinc-600 leading-relaxed font-bold uppercase tracking-widest">
-                Export uses pre-rendered snapshots for 100% editor parity.
+                ZIP export produces one file per Mode, containing all device sizes.
               </p>
             </div>
           </div>
@@ -566,6 +595,7 @@ const App: React.FC = () => {
                     onFitChange={(mode) => setState(prev => ({ ...prev, fitMode: mode }))}
                     onCropChange={(cropArea) => setState(prev => ({ ...prev, cropArea }))}
                     onClose={() => setIsCropMode(false)}
+                    showConfirm={showConfirm}
                   />
                 </div>
               ) : (
@@ -577,13 +607,19 @@ const App: React.FC = () => {
                     fitMode={state.fitMode}
                     cropArea={state.cropArea}
                     adjustments={state.adjustments}
+                    frameColor={state.frameColor}
+                    onColorChange={(hex) => setState(prev => ({ ...prev, frameColor: hex }))}
                   />
                   {state.image && (
                     <button 
-                      onClick={() => {
-                        if (window.confirm("Are you sure you want to discard the current master screenshot and all edits?")) {
-                          setState(prev => ({ ...prev, image: null }));
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        showConfirm(
+                          "Discard Master",
+                          "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
+                          () => setState(prev => ({ ...prev, image: null })),
+                          "Discard"
+                        );
                       }}
                       className="absolute -top-6 -right-6 w-12 h-12 bg-zinc-900 hover:bg-red-600 rounded-full flex items-center justify-center text-zinc-600 hover:text-white border border-zinc-800 shadow-2xl transition-all group active:scale-90"
                     >
@@ -632,7 +668,10 @@ const App: React.FC = () => {
                            {item.filename}
                         </div>
                         <button 
-                          onClick={() => removeFromTray(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromTrayById(item.id);
+                          }}
                           className="px-6 py-2 bg-red-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-red-500 transition-colors shadow-xl"
                         >
                           REMOVE

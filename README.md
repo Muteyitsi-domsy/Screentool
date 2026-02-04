@@ -1,3 +1,4 @@
+
 # 📱 ScreenFrame — Screenshot Studio
 > **Store-ready screenshots. Exactly as you see them.**
 
@@ -5,87 +6,84 @@
 
 ---
 
-## 🎯 Why ScreenFrame Exists
+## 🎯 The Coherence Engine
 
-App stores require multiple screenshots per device, strict aspect ratios, consistent framing, and separate exports per platform. Most tools either silently change your screenshots or make batch export painful and error-prone. 
+ScreenFrame features a dual-module engine that harmonizes disparate hardware classes into a single visual "Vibe." 
 
-**ScreenFrame is built around trust.** If it looks right in the editor, it is right in the export.
+### 🍏 The Apple Module (Sanitization)
+Apple screenshots often contain system artifacts or inconsistent modal padding. 
+- **Auto-Sanitization**: Upon import, Apple assets are analyzed for modal borders. 
+- **Canonical Insets**: The engine applies a deterministic 4% "Breathing Room" inset for standard views and 8% for modals.
+- **Hardware Integration**: Content is mapped to the exact corner radii of the iPhone 15/16 Pro and iPad Pro 12.9" chassis.
+
+### 🤖 The Android Module (Harmonization)
+Android screenshots vary wildly in aspect ratio (9:16 to 10:16). 
+- **Height-Locked Scaling**: To prevent "naïve scaling" (where UI elements look huge on tablets), the engine anchors the height and centers the content. 
+- **Scale Parity**: A button on a 7" tablet render will appear at the same visual scale as on a 6.7" phone render.
+- **Class-Specific Chassis**: Tablets use sharper 4% corner radii and thinner bezel ratios (10%) compared to phones (8% radii / 12% bezel) to meet Play Store aesthetic standards.
 
 ---
 
 ## 💎 Core Principles
 
-### 1. What You See Is What You Get (WYSIWYG)
-ScreenFrame enforces a single visual source of truth. There is exactly one canonical content viewport per device. Every preview and every export is a direct render of that viewport. No post-processing or "helpful" re-fitting at export time.
+### 1. Front-Loaded Normalization
+Normalization happens **once** at the `processFile` stage. This establishes the "Canonical Master." All subsequent user edits (Crop, Pan, Auto-Shine) are applied to this clean anchor. This prevents "logic drift" where an export might look different than the preview.
 
-### 2. Framing, Not Altering
-The studio establishes safe framing and adds platform-specific chrome (like Dynamic Islands or camera pinholes). It will **never** remove app UI, redraw content, or change pixels after you finish editing. Your screenshots remain your screenshots.
+### 2. Deterministic WYSIWYG
+ScreenFrame enforces a single visual source of truth. Every preview in the editor and every item in the tray is a direct render of the canonical viewport. No "helpful" re-fitting happens at export time.
 
 ### 3. Immutable Export Tray
-Screenshots are edited one at a time and "parked" in the tray as immutable snapshots. Further edits to the active editor state never affect already-captured assets. Think of it as a staging table for final assets.
+Screenshots are "parked" in the tray as immutable snapshots. Further edits to the active editor state never affect already-captured assets. 
 
 ### 4. Deterministic Batch Export
-Exports are grouped by tray metadata and named using a strict, predictable contract. They are never re-rendered or modified at download time.
+Exports are grouped into **Platform Kits** (ZIP files) based on Platform and Mode. 
+- `apple_mockup_screenshots.zip`
+- `android_rect_screenshots.zip`
 
 ---
 
 ## ⚖️ Guiding Invariant (Non-Negotiable)
 
 **All exports must be pure renders of user-approved state.**
-No logic may alter pixels after the user finishes editing.
-
-*   **Stable Indexing**: If the same device + mode appears twice in the tray, the index increments and filenames remain stable.
-*   **Locked Metadata**: Filenames, device identity, and ordering are locked at capture time.
+No logic may alter pixels or re-normalize assets after the user clicks "Add to Tray."
 
 ---
 
 ## 📜 The Naming Contract
 
 ScreenFrame enforces a strict, machine-readable naming system:
-
 `{platform}_{device}_{size}_{mode}_{index}.png`
 
 | Segment | Values | Description |
 | :--- | :--- | :--- |
 | **Platform** | `apple`, `android` | Targeted store platform. |
-| **Device** | `phone`, `tablet`, `chromebook` | Generic device category. |
+| **Device** | `phone`, `tablet` | Generic device category. |
 | **Size** | `6.7`, `6.1`, `12.9`, `7in`, `10in` | Specific display identity. |
 | **Mode** | `rect`, `mockup` | Composition style (`rect` = Full, `mockup` = Framed). |
 | **Index** | `01`, `02`, `03`... | Sequential counter per device/mode bucket. |
 
-**Example Output**: `apple_phone_6.7_mockup_01.png`
-**Example ZIP**: `apple_phone_6.7_mockup_screenshots.zip`
-
 ---
 
-## 🛠 Supported Platforms & Outputs
+## 🛠 Supported Modules
 
-### Platforms
-*   **Apple**: iPhone 6.1", 6.7", iPad Pro 12.9"
-*   **Android**: Phone (9:16), Tablet 7", Tablet 10", Chromebook (16:9)
+### Apple Ecosystem
+- **iPhone 6.7" / 6.1"**: Precision dynamic island and bezel mapping.
+- **iPad Pro 12.9"**: Canonical 3:4 aspect ratio with slate-radius framing.
 
-### Output Modes
-*   **Rectangle**: Clean, store-upload ready assets.
-*   **Device Mockups**: Hardware-chassis renders derived from the same canonical viewport.
+### Android Ecosystem
+- **9:16 Phone**: Standard high-density phone standard.
+- **7" & 10" Tablets**: 10:16 aspect ratio with height-locked content parity.
+- **Chromebook**: 16:9 landscape standard.
 
 ---
 
 ## 💡 Workflow
 
-1.  **Initialize**: Drop your master screenshot into the studio.
-2.  **Configure**: Select your target device module.
-3.  **Refine**: Use the **Crop Area** or **Adjustment Matrix** to tune the visual.
-4.  **Capture**: Click **"Add Snapshot to Tray"** to lock in the asset.
-5.  **Batch**: Switch to the **Tray View** and export your platform kits.
-
----
-
-## 🚫 What ScreenFrame Is Not
-*   Not a design tool.
-*   Not a creative editor.
-*   Not a generic mockup generator.
-
-ScreenFrame is a **precision utility** for getting screenshots accepted on the first try.
+1.  **Initialize**: Drop your master screenshot. The engine auto-detects borders and normalizes for the active module.
+2.  **Harmonize**: Switch between device classes (e.g., Phone to Tablet) to verify content scale parity.
+3.  **Refine**: Use **Crop Area** for precision framing or **Auto-Shine** for instant contrast/saturation "pop."
+4.  **Capture**: Click **"Add Snapshot to Tray"** to lock the asset into the export queue.
+5.  **Batch**: Switch to **Tray View** to download your multi-device Platform Kits.
 
 ---
 

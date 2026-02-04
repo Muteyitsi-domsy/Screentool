@@ -1,5 +1,5 @@
 
-import { DeviceSpec, FitMode, ExportMode, CropArea, ImageAdjustments, Platform } from './types';
+import { DeviceSpec, FitMode, ExportMode, CropArea, ImageAdjustments, Platform, DeviceType } from './types';
 
 /**
  * Detects solid color borders in an image.
@@ -90,7 +90,8 @@ export const processImage = async (
   fitMode: FitMode,
   exportMode: ExportMode,
   adjustments: ImageAdjustments,
-  cropArea: CropArea
+  cropArea: CropArea,
+  frameColor: string = '#1a1a1a'
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
@@ -104,6 +105,7 @@ export const processImage = async (
       canvas.height = spec.height;
 
       const isApple = spec.platform === Platform.APPLE;
+      const isAndroid = spec.platform === Platform.ANDROID;
       const bgColor = "#050505";
       
       if (exportMode === ExportMode.FRAME) {
@@ -121,8 +123,7 @@ export const processImage = async (
       let targetW = spec.width;
       let targetH = spec.height;
 
-      // Logic: Apple outputs need breathing room (safe-area padding)
-      // Even in RECTANGLE mode, we apply a tiny logical inset if preferred to avoid edge-to-edge clash
+      // Apple-specific fit padding (Breathing Room)
       if (isApple && fitMode === FitMode.FIT) {
         const appleBreathingRoom = spec.width * 0.04; 
         targetX += appleBreathingRoom;
@@ -131,10 +132,12 @@ export const processImage = async (
         targetH -= appleBreathingRoom * 2;
       }
 
-      // Hardware Frame Logic
       if (exportMode === ExportMode.FRAME) {
-        // Frames already have their own large padding logic
-        const framePadding = spec.width * 0.12;
+        const isTablet = spec.isTablet;
+        const framePadding = isAndroid && isTablet 
+          ? spec.width * 0.10 // Tablet bezel (10%)
+          : spec.width * 0.12; // Standard/Phone bezel (12%)
+          
         targetX = framePadding;
         targetY = framePadding;
         targetW = spec.width - framePadding * 2;
@@ -145,7 +148,8 @@ export const processImage = async (
         const bodyY = targetY - bezelWidth;
         const bodyW = targetW + bezelWidth * 2;
         const bodyH = targetH + bezelWidth * 2;
-        const bodyRadius = spec.isTablet ? spec.width * 0.05 : spec.width * 0.1;
+        
+        const bodyRadius = isTablet ? spec.width * 0.04 : spec.width * 0.1;
 
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
@@ -157,20 +161,20 @@ export const processImage = async (
         ctx.restore();
 
         const chassisGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY);
-        chassisGrad.addColorStop(0, '#111');
-        chassisGrad.addColorStop(0.5, '#2a2a2a');
-        chassisGrad.addColorStop(1, '#111');
+        chassisGrad.addColorStop(0, frameColor);
+        chassisGrad.addColorStop(0.5, isApple ? '#ffffff22' : '#00000011'); 
+        chassisGrad.addColorStop(1, frameColor);
         
         ctx.fillStyle = chassisGrad;
         ctx.beginPath();
         ctx.roundRect(bodyX, bodyY, bodyW, bodyH, bodyRadius);
         ctx.fill();
 
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = isApple ? '#ffffff11' : '#00000011';
         ctx.lineWidth = spec.width * 0.004;
         ctx.stroke();
 
-        if (!spec.isTablet && spec.width < spec.height) {
+        if (!isTablet && spec.width < spec.height) {
           if (isApple) {
              const islandW = bodyW * 0.22;
              const islandH = bodyH * 0.016;
@@ -193,7 +197,6 @@ export const processImage = async (
         }
       }
 
-      // Scaling logic: Derive from the same logical content region
       const sx = (cropArea.x / 100) * img.width;
       const sy = (cropArea.y / 100) * img.height;
       const sw = (cropArea.width / 100) * img.width;
@@ -216,7 +219,14 @@ export const processImage = async (
           drawX = targetX + (targetW - drawW) / 2;
         }
       } else if (fitMode === FitMode.AUTOFIT) {
-        if (imgRatio > targetRatio) {
+        // HARMONIZED ANDROID TRANSITION
+        // We match Height instead of Width to prevent UI stretching when moving
+        // from Phone (9:16) to Tablet (10:16).
+        if (isAndroid && spec.isTablet && imgRatio < targetRatio) {
+           drawH = targetH;
+           drawW = targetH * imgRatio;
+           drawX = targetX + (targetW - drawW) / 2;
+        } else if (imgRatio > targetRatio) {
           drawW = targetH * imgRatio;
           drawX = targetX + (targetW - drawW) / 2;
         } else {
@@ -227,7 +237,8 @@ export const processImage = async (
 
       ctx.save();
       if (exportMode === ExportMode.FRAME) {
-        const screenRadius = spec.isTablet ? spec.width * 0.04 : spec.width * 0.08;
+        const isTablet = spec.isTablet;
+        const screenRadius = isTablet ? spec.width * 0.03 : spec.width * 0.08;
         ctx.beginPath();
         ctx.roundRect(targetX, targetY, targetW, targetH, screenRadius);
         ctx.clip();

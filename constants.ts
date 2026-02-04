@@ -62,3 +62,18 @@ export const DEVICE_SPECS: Record<DeviceType, DeviceSpec> = {
     isTablet: true
   }
 };
+
+export const FRAME_COLORS = {
+  [Platform.APPLE]: [
+    { name: 'Black Titanium', hex: '#1a1a1a' },
+    { name: 'Natural Titanium', hex: '#beb8af' },
+    { name: 'White Titanium', hex: '#f2f1ed' },
+    { name: 'Desert Titanium', hex: '#c8b19a' },
+  ],
+  [Platform.ANDROID]: [
+    { name: 'Phantom Black', hex: '#1a1a1a' },
+    { name: 'Titanium Gray', hex: '#7a7a7a' },
+    { name: 'Titanium Violet', hex: '#5b546a' },
+    { name: 'Titanium Yellow', hex: '#f2e8cf' },
+  ]
+};

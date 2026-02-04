@@ -51,7 +51,7 @@ export const detectBorders = (img: HTMLImageElement): CropArea => {
 };
 
 /**
- * Applies unsharp mask convolution for professional asset sharpness.
+ * Applies unsharp mask convolution for sharpness.
  */
 const applySharpness = (ctx: CanvasRenderingContext2D, width: number, height: number, amount: number) => {
   if (amount <= 0) return;
@@ -90,7 +90,8 @@ export const processImage = async (
   fitMode: FitMode,
   exportMode: ExportMode,
   adjustments: ImageAdjustments,
-  cropArea: CropArea
+  cropArea: CropArea,
+  frameColor: string = '#1a1a1a'
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
@@ -106,11 +107,10 @@ export const processImage = async (
       const isApple = spec.platform === Platform.APPLE;
       const bgColor = "#050505";
       
-      // Background Rendering
       if (exportMode === ExportMode.FRAME) {
         const bgGrad = ctx.createLinearGradient(0, 0, spec.width, spec.height);
-        bgGrad.addColorStop(0, "#111111");
-        bgGrad.addColorStop(1, "#000000");
+        bgGrad.addColorStop(0, "#0a0a0a");
+        bgGrad.addColorStop(1, "#000");
         ctx.fillStyle = bgGrad;
       } else {
         ctx.fillStyle = bgColor;
@@ -122,7 +122,14 @@ export const processImage = async (
       let targetW = spec.width;
       let targetH = spec.height;
 
-      // Hardware Frame Logic
+      if (isApple && fitMode === FitMode.FIT) {
+        const appleBreathingRoom = spec.width * 0.04; 
+        targetX += appleBreathingRoom;
+        targetY += appleBreathingRoom;
+        targetW -= appleBreathingRoom * 2;
+        targetH -= appleBreathingRoom * 2;
+      }
+
       if (exportMode === ExportMode.FRAME) {
         const framePadding = spec.width * 0.12;
         targetX = framePadding;
@@ -137,7 +144,6 @@ export const processImage = async (
         const bodyH = targetH + bezelWidth * 2;
         const bodyRadius = spec.isTablet ? spec.width * 0.05 : spec.width * 0.1;
 
-        // Shadow
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.8)';
         ctx.shadowBlur = spec.width * 0.1;
@@ -147,27 +153,24 @@ export const processImage = async (
         ctx.fill();
         ctx.restore();
 
-        // Chassis
         const chassisGrad = ctx.createLinearGradient(bodyX, bodyY, bodyX + bodyW, bodyY);
-        chassisGrad.addColorStop(0, '#1a1a1a');
-        chassisGrad.addColorStop(0.5, '#333333');
-        chassisGrad.addColorStop(1, '#1a1a1a');
+        chassisGrad.addColorStop(0, frameColor);
+        chassisGrad.addColorStop(0.5, isApple ? '#ffffff22' : '#00000011'); 
+        chassisGrad.addColorStop(1, frameColor);
         
         ctx.fillStyle = chassisGrad;
         ctx.beginPath();
         ctx.roundRect(bodyX, bodyY, bodyW, bodyH, bodyRadius);
         ctx.fill();
 
-        // Rim Highlight
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = spec.width * 0.005;
+        ctx.strokeStyle = isApple ? '#ffffff11' : '#00000011';
+        ctx.lineWidth = spec.width * 0.004;
         ctx.stroke();
 
-        // Platform-Specific hardware details
         if (!spec.isTablet && spec.width < spec.height) {
           if (isApple) {
              const islandW = bodyW * 0.22;
-             const islandH = bodyH * 0.018;
+             const islandH = bodyH * 0.016;
              const islandX = bodyX + (bodyW - islandW) / 2;
              const islandY = bodyY + (bodyH * 0.024);
              ctx.fillStyle = '#000';
@@ -175,27 +178,18 @@ export const processImage = async (
              ctx.roundRect(islandX, islandY, islandW, islandH, islandH / 2);
              ctx.fill();
           } else {
-             const notchSize = bodyW * 0.05;
-             const notchX = bodyX + (bodyW - notchSize) / 2;
+             const notchW = bodyW * 0.05;
+             const notchH = notchW;
+             const notchX = bodyX + (bodyW - notchW) / 2;
              const notchY = bodyY + (bodyH * 0.024);
-             ctx.fillStyle = '#0a0a0a';
+             ctx.fillStyle = '#080808';
              ctx.beginPath();
-             ctx.arc(notchX + notchSize/2, notchY + notchSize/2, notchSize/2, 0, Math.PI * 2);
+             ctx.arc(notchX + notchW/2, notchY + notchH/2, notchW/2, 0, Math.PI * 2);
              ctx.fill();
           }
         }
-      } else {
-        // Subtle inset for RECTANGLE mode on Apple to maintain compliance branding
-        if (isApple && fitMode === FitMode.FIT) {
-          const appleBreathingRoom = spec.width * 0.04; 
-          targetX += appleBreathingRoom;
-          targetY += appleBreathingRoom;
-          targetW -= appleBreathingRoom * 2;
-          targetH -= appleBreathingRoom * 2;
-        }
       }
 
-      // Canonical content processing
       const sx = (cropArea.x / 100) * img.width;
       const sy = (cropArea.y / 100) * img.height;
       const sw = (cropArea.width / 100) * img.width;
@@ -228,7 +222,6 @@ export const processImage = async (
       }
 
       ctx.save();
-      // Screen masking for FRAME mode
       if (exportMode === ExportMode.FRAME) {
         const screenRadius = spec.isTablet ? spec.width * 0.04 : spec.width * 0.08;
         ctx.beginPath();
@@ -236,7 +229,6 @@ export const processImage = async (
         ctx.clip();
       }
       
-      // Apply filters and draw image
       ctx.filter = `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
       ctx.drawImage(img, sx, sy, sw, sh, drawX, drawY, drawW, drawH);
       

@@ -207,33 +207,33 @@ export const processImage = async (
 
       let drawW = targetW;
       let drawH = targetH;
-      let drawX = targetX;
-      let drawY = targetY;
 
       if (fitMode === FitMode.FIT) {
         if (imgRatio > targetRatio) {
           drawH = targetW / imgRatio;
-          drawY = targetY + (targetH - drawH) / 2;
         } else {
           drawW = targetH * imgRatio;
-          drawX = targetX + (targetW - drawW) / 2;
         }
       } else if (fitMode === FitMode.AUTOFIT) {
-        // HARMONIZED ANDROID TRANSITION
-        // We match Height instead of Width to prevent UI stretching when moving
-        // from Phone (9:16) to Tablet (10:16).
         if (isAndroid && spec.isTablet && imgRatio < targetRatio) {
            drawH = targetH;
            drawW = targetH * imgRatio;
-           drawX = targetX + (targetW - drawW) / 2;
         } else if (imgRatio > targetRatio) {
           drawW = targetH * imgRatio;
-          drawX = targetX + (targetW - drawW) / 2;
         } else {
           drawH = targetW / imgRatio;
-          drawY = targetY + (targetH - drawH) / 2;
         }
       }
+
+      // Apply iPad presentation scale adjustment (0.92) for aesthetic "breathing space"
+      if (spec.id === DeviceType.IPAD) {
+        drawW *= 0.92;
+        drawH *= 0.92;
+      }
+
+      // Final Unified Centering calculation
+      const drawX = targetX + (targetW - drawW) / 2;
+      const drawY = targetY + (targetH - drawH) / 2;
 
       ctx.save();
       if (exportMode === ExportMode.FRAME) {

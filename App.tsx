@@ -11,12 +11,15 @@ import {
   ImageAdjustments,
   DeviceSpec,
   AppView,
-  TrayItem
+  TrayItem,
+  TrayVariant,
+  Project
 } from './types';
 import { DEVICE_SPECS } from './constants';
 import DeviceMockup from './components/DeviceMockup';
 import CropEditor from './components/CropEditor';
 import { processImage, detectBorders } from './imageUtils';
+import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db';
 
 const NEUTRAL_BASELINE: ImageAdjustments = {
   brightness: 100,
@@ -34,9 +37,10 @@ const AUTO_SHINE_PRESET: ImageAdjustments = {
 
 interface ModalState {
   isOpen: boolean;
+  type?: 'confirm' | 'save' | 'load' | 'alert';
   title: string;
   message: string;
-  onConfirm: () => void;
+  onConfirm: (data?: any) => void;
   confirmLabel?: string;
 }
 
@@ -60,11 +64,15 @@ const App: React.FC = () => {
     onConfirm: () => {},
   });
 
+  const [savedProjects, setSavedProjects] = useState<Project[]>([]);
   const [isExporting, setIsExporting] = useState<Platform | null>(null);
   const [isAddingToTray, setIsAddingToTray] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isCropMode, setIsCropMode] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [draggedSlotIdx, setDraggedSlotIdx] = useState<number | null>(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
+  const [isRevision, setIsRevision] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,13 +86,21 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, frameColor: '#1a1a1a' }));
   }, [state.selectedDevice]);
 
-  /**
-   * REINFORCED MODAL LOGIC
-   * Ensures intent is returned via callback without executing state updates internally.
-   */
+  const showAlert = (title: string, message: string) => {
+    setModal({
+      isOpen: true,
+      type: 'alert',
+      title,
+      message,
+      onConfirm: () => setModal(prev => ({ ...prev, isOpen: false })),
+      confirmLabel: "Got it"
+    });
+  };
+
   const showConfirm = (title: string, message: string, onConfirm: () => void, confirmLabel: string = "Confirm") => {
     setModal({
       isOpen: true,
+      type: 'confirm',
       title,
       message,
       onConfirm: () => {
@@ -93,6 +109,96 @@ const App: React.FC = () => {
       },
       confirmLabel
     });
+  };
+
+  const showSaveModal = () => {
+    setModal({
+      isOpen: true,
+      type: 'save',
+      title: 'Save Project',
+      message: 'Enter a name for this screenshot kit snapshot.',
+      onConfirm: async (name: string) => {
+        const project: Project = {
+          id: crypto.randomUUID(),
+          name: name || `Project ${new Date().toLocaleDateString()}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          version: 1,
+          tray: state.tray
+        };
+        await saveProjectToDB(project);
+        setModal(prev => ({ ...prev, isOpen: false }));
+        setShowSuccess(true);
+      },
+      confirmLabel: 'Save'
+    });
+  };
+
+  const showLoadModal = async () => {
+    const projects = await getAllProjectsFromDB();
+    setSavedProjects(projects.sort((a, b) => b.updatedAt - a.updatedAt));
+    setModal({
+      isOpen: true,
+      type: 'load',
+      title: 'Open Project',
+      message: 'Loading a project will replace your current tray. The editor will remain blank.',
+      onConfirm: (project: Project) => {
+        state.tray.forEach(item => {
+          item?.variants.forEach(v => URL.revokeObjectURL(v.renderedImageUrl));
+        });
+
+        const rehydratedTray = project.tray.map(item => {
+          if (!item) return null;
+          return {
+            ...item,
+            variants: item.variants.map(v => ({
+              ...v,
+              renderedImageUrl: URL.createObjectURL(v.renderedBlob)
+            }))
+          };
+        });
+
+        setState(prev => ({
+          ...prev,
+          image: null,
+          tray: rehydratedTray,
+          activeView: AppView.TRAY
+        }));
+        setIsRevision(false);
+        setModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const deleteProject = async (id: string) => {
+    await deleteProjectFromDB(id);
+    const projects = await getAllProjectsFromDB();
+    setSavedProjects(projects.sort((a, b) => b.updatedAt - a.updatedAt));
+  };
+
+  const editCopyFromTray = (id: string) => {
+    if (state.image) {
+      showAlert(
+        "Editor Occupied",
+        "Finish or discard your current edit before revising a tray screenshot."
+      );
+      return;
+    }
+
+    const item = state.tray.find(i => i?.id === id);
+    if (!item) return;
+
+    // Use primary variant as base for revision
+    const primaryVariant = item.variants[0];
+    
+    setState(prev => ({
+      ...prev,
+      image: primaryVariant.renderedImageUrl,
+      cropArea: { x: 0, y: 0, width: 100, height: 100 },
+      adjustments: { ...NEUTRAL_BASELINE },
+      activeView: AppView.EDITOR
+    }));
+    setIsRevision(true);
   };
 
   const getExportFilename = (spec: DeviceSpec, mode: ExportMode, index: number): string => {
@@ -147,7 +253,6 @@ const App: React.FC = () => {
         let normalizationRect = detectBorders(img);
         const targetSpec = DEVICE_SPECS[state.selectedDevice];
         
-        // CANONICAL VIEWPORT NORMALIZATION
         if (targetSpec.platform === Platform.APPLE) {
           const isModal = normalizationRect.width < 95 || normalizationRect.height < 95;
           const insetFactor = isModal ? 0.08 : 0.04;
@@ -160,13 +265,7 @@ const App: React.FC = () => {
             height: normalizationRect.height - (insetH * 2)
           };
         } else if (targetSpec.platform === Platform.ANDROID) {
-          // Android Harmonization: No insets, but ensure dead-centering 
-          // to maintain app content parity across phone/tablet viewports.
-          const isLandscape = normalizationRect.width > normalizationRect.height;
-          // Predicable composition start: 
-          // If master has status bars, detectBorders handled it; 
-          // we just ensure the resulting asset is a perfect canonical anchor.
-          console.debug("Android Canonical Normalization complete for Class:", targetSpec.id);
+          console.debug("Android Canonical Normalization complete.");
         }
         
         const cleanAsset = createCanonicalAsset(img, normalizationRect);
@@ -176,6 +275,7 @@ const App: React.FC = () => {
           cropArea: { x: 0, y: 0, width: 100, height: 100 },
           adjustments: { ...NEUTRAL_BASELINE }
         }));
+        setIsRevision(false);
       };
       img.src = dataUrl;
     };
@@ -194,39 +294,50 @@ const App: React.FC = () => {
     setIsAddingToTray(true);
 
     try {
-      const spec = DEVICE_SPECS[state.selectedDevice];
+      const activeSpec = DEVICE_SPECS[state.selectedDevice];
+      const targetPlatform = activeSpec.platform;
+      
       const bucketItems = state.tray.filter(item => 
         item !== null && 
-        item.deviceType === state.selectedDevice && 
+        item.platform === targetPlatform && 
         item.exportMode === state.exportMode
       );
       const maxIndexInBucket = bucketItems.reduce((max, item) => Math.max(max, item!.index), 0);
       const calculatedIndex = maxIndexInBucket + 1;
 
-      const renderedBlob = await processImage(
-        state.image,
-        spec,
-        state.fitMode,
-        state.exportMode,
-        state.adjustments,
-        state.cropArea,
-        state.frameColor
-      );
+      const targetSpecs = Object.values(DEVICE_SPECS).filter(s => s.platform === targetPlatform);
+      
+      const variantPromises = targetSpecs.map(async (spec): Promise<TrayVariant> => {
+        const renderedBlob = await processImage(
+          state.image!,
+          spec,
+          state.fitMode,
+          state.exportMode,
+          state.adjustments,
+          state.cropArea,
+          state.frameColor
+        );
+        const renderedImageUrl = URL.createObjectURL(renderedBlob);
+        const filename = getExportFilename(spec, state.exportMode, calculatedIndex);
+        
+        return {
+          deviceType: spec.id,
+          renderedImageUrl,
+          renderedBlob,
+          filename
+        };
+      });
 
-      const renderedImageUrl = URL.createObjectURL(renderedBlob);
-      const filename = getExportFilename(spec, state.exportMode, calculatedIndex);
+      const variants = await Promise.all(variantPromises);
 
       const newItem: TrayItem = {
         id: crypto.randomUUID(),
-        renderedImageUrl,
-        renderedBlob,
-        platform: spec.platform,
-        deviceType: state.selectedDevice,
+        platform: targetPlatform,
         exportMode: state.exportMode,
         index: calculatedIndex,
-        filename,
         timestamp: Date.now(),
-        frameColor: state.frameColor
+        frameColor: state.frameColor,
+        variants
       };
 
       setState(prev => {
@@ -234,30 +345,27 @@ const App: React.FC = () => {
         newTray[emptySlotIndex] = newItem;
         return { ...prev, tray: newTray };
       });
+      setIsRevision(false);
     } catch (err) {
-      console.error("Capture failure:", err);
-      alert("System Error: Failed to capture snapshot.");
+      console.error("Capture fan-out failure:", err);
+      alert("System Error: Failed to generate multi-device kit variants.");
     } finally {
       setIsAddingToTray(false);
     }
   };
 
-  /**
-   * STABLE-ID TRAY REMOVAL
-   * Targets specific ID to prevent reindexing or slot collisions in 8-item tray.
-   */
   const removeFromTrayById = (id: string) => {
     const itemIndex = state.tray.findIndex(item => item?.id === id);
     if (itemIndex === -1) return;
 
     showConfirm(
-      "Remove Snapshot", 
-      "Are you sure you want to remove this screenshot from the Export Tray?", 
+      "Remove Screenshot", 
+      "Are you sure you want to remove this screenshot (and all its device variants) from the Export Tray?", 
       () => {
         setState(prev => {
           const currentItem = prev.tray[itemIndex];
           if (currentItem) {
-            URL.revokeObjectURL(currentItem.renderedImageUrl);
+            currentItem.variants.forEach(v => URL.revokeObjectURL(v.renderedImageUrl));
           }
           const newTray = [...prev.tray];
           newTray[itemIndex] = null;
@@ -268,51 +376,72 @@ const App: React.FC = () => {
     );
   };
 
-  /**
-   * UNIFIED BATCH EXPORT LOGIC
-   * Groups items by Platform x Mode only, generating one ZIP per mode containing all device sizes.
-   */
+  const handleTrayDragStart = (idx: number) => {
+    if (modal.isOpen || state.tray[idx] === null) return;
+    setDraggedSlotIdx(idx);
+  };
+
+  const handleTrayDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (modal.isOpen) return;
+    if (idx !== dropTargetIdx) setDropTargetIdx(idx);
+  };
+
+  const handleTrayDrop = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (modal.isOpen || draggedSlotIdx === null || draggedSlotIdx === targetIdx) {
+      setDraggedSlotIdx(null);
+      setDropTargetIdx(null);
+      return;
+    }
+
+    setState(prev => {
+      const newTray = [...prev.tray];
+      const sourceItem = newTray[draggedSlotIdx];
+      newTray[draggedSlotIdx] = newTray[targetIdx];
+      newTray[targetIdx] = sourceItem;
+      return { ...prev, tray: newTray };
+    });
+
+    setDraggedSlotIdx(null);
+    setDropTargetIdx(null);
+  };
+
   const handleBatchExport = async (targetPlatform: Platform) => {
     const trayItems = state.tray.filter((item): item is TrayItem => item !== null && item.platform === targetPlatform);
     if (trayItems.length === 0) return;
     setIsExporting(targetPlatform);
 
     try {
-      const groups: Record<string, TrayItem[]> = {};
+      const platformLabel = targetPlatform.toLowerCase();
+      const finalZipName = `${platformLabel}_platform_kit.zip`;
+      const zip = new JSZip();
+
+      const rectFolder = zip.folder("full_resolution");
+      const mockupFolder = zip.folder("mockups");
+
       trayItems.forEach(item => {
-        // Mode-level grouping (e.g., 'RECTANGLE' or 'FRAME')
-        const groupKey = item.exportMode;
-        if (!groups[groupKey]) groups[groupKey] = [];
-        groups[groupKey].push(item);
-      });
-
-      for (const mode in groups) {
-        const groupItems = groups[mode];
-        if (groupItems.length === 0) continue;
-
-        const modeLabel = mode === ExportMode.RECTANGLE ? 'rect' : 'mockup';
-        const platformLabel = targetPlatform.toLowerCase();
-        const finalZipName = `${platformLabel}_${modeLabel}_screenshots.zip`;
-
-        const zip = new JSZip();
-        groupItems.forEach(item => {
-          zip.file(item.filename, item.renderedBlob);
-        });
+        const targetFolder = item.exportMode === ExportMode.RECTANGLE ? rectFolder : mockupFolder;
         
-        const content = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(content);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = finalZipName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
+        item.variants.forEach(variant => {
+          targetFolder?.file(variant.filename, variant.renderedBlob);
+        });
+      });
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = finalZipName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
       setShowSuccess(true);
     } catch (err) {
       console.error("Batch crash:", err);
-      alert("Batch engine failed to build platform kit ZIPs.");
+      alert("Batch engine failed to build platform kit ZIP.");
     } finally {
       setIsExporting(null);
     }
@@ -351,26 +480,81 @@ const App: React.FC = () => {
   );
 
   const isTrayView = state.activeView === AppView.TRAY;
+  const hasItems = state.tray.some(x => x !== null);
   const hasApple = state.tray.some(x => x?.platform === Platform.APPLE);
   const hasAndroid = state.tray.some(x => x?.platform === Platform.ANDROID);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a]">
-      {/* GLOBAL CONFIRMATION MODAL */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300">
-             <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4">{modal.title}</h3>
-             <p className="text-zinc-400 text-xs font-medium leading-relaxed mb-8 uppercase tracking-wider">{modal.message}</p>
-             <div className="flex gap-3">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[80vh]">
+             <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4 shrink-0">{modal.title}</h3>
+             <p className="text-zinc-400 text-[10px] font-black leading-relaxed mb-6 uppercase tracking-wider shrink-0">{modal.message}</p>
+             
+             {modal.type === 'save' && (
+               <div className="mb-8">
+                  <input 
+                    type="text" 
+                    placeholder="Project Name..."
+                    autoFocus
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-blue-500 transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') modal.onConfirm((e.target as HTMLInputElement).value);
+                    }}
+                    id="project-name-input"
+                  />
+               </div>
+             )}
+
+             {modal.type === 'load' && (
+               <div className="flex-1 overflow-y-auto mb-8 pr-2 space-y-3 scrollbar-hide">
+                 {savedProjects.length > 0 ? savedProjects.map(project => (
+                   <div 
+                    key={project.id}
+                    className="group relative flex items-center justify-between p-4 bg-zinc-950/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800/50 transition-all cursor-pointer"
+                    onClick={() => modal.onConfirm(project)}
+                   >
+                     <div>
+                        <span className="block text-[10px] font-black text-white uppercase tracking-widest mb-1">{project.name}</span>
+                        <span className="block text-[8px] font-black text-zinc-500 uppercase tracking-widest">{new Date(project.createdAt).toLocaleDateString()} • {project.tray.filter(x => x !== null).length} Items</span>
+                     </div>
+                     <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteProject(project.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-500 transition-all"
+                      >
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                     </button>
+                   </div>
+                 )) : (
+                   <div className="py-12 text-center">
+                     <p className="text-[10px] font-black text-zinc-700 uppercase tracking-widest">No Projects Found</p>
+                   </div>
+                 )}
+               </div>
+             )}
+
+             <div className="flex gap-3 shrink-0">
+                {modal.type !== 'alert' && (
+                  <button 
+                    onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
+                    className="flex-1 py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button 
-                  onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
-                  className="flex-1 py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={modal.onConfirm}
+                  onClick={() => {
+                    if (modal.type === 'save') {
+                      const input = document.getElementById('project-name-input') as HTMLInputElement;
+                      modal.onConfirm(input?.value);
+                    } else {
+                      modal.onConfirm();
+                    }
+                  }}
                   className="flex-1 py-3 text-[10px] font-black text-white uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-2xl transition-all shadow-lg shadow-blue-500/20"
                 >
                   {modal.confirmLabel || "Confirm"}
@@ -406,6 +590,18 @@ const App: React.FC = () => {
 
         {!isTrayView ? (
           <>
+            {isRevision && (
+              <div className="p-4 bg-blue-600/10 border border-blue-500/20 rounded-2xl space-y-2 animate-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-2">
+                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                   <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Revision Workflow Active</span>
+                </div>
+                <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest leading-relaxed">
+                  Refining an existing capture. Adding to tray will create a new version.
+                </p>
+              </div>
+            )}
+
             <section className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Precision Tools</label>
               <div className="grid grid-cols-2 gap-2">
@@ -516,6 +712,27 @@ const App: React.FC = () => {
           </>
         ) : (
           <div className="space-y-6">
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Project Management</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  disabled={!hasItems}
+                  onClick={showSaveModal}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 transition-all hover:border-blue-500 disabled:opacity-30"
+                >
+                  <svg className="w-5 h-5 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">Save Kit</span>
+                </button>
+                <button 
+                  onClick={showLoadModal}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 transition-all hover:border-blue-500"
+                >
+                  <svg className="w-5 h-5 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5S19.832 5.477 21 6.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">Open Kit</span>
+                </button>
+              </div>
+            </section>
+
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Batch Operations</label>
               
@@ -552,7 +769,7 @@ const App: React.FC = () => {
                 <span className="text-[10px] font-mono text-white">{state.tray.filter(x => x !== null).length}/8</span>
               </div>
               <p className="text-[9px] text-zinc-600 leading-relaxed font-bold uppercase tracking-widest">
-                ZIP export produces one file per Mode, containing all device sizes.
+                Drag and drop snapshots to reorder your kit's presentation and ZIP sequence.
               </p>
             </div>
           </div>
@@ -560,7 +777,7 @@ const App: React.FC = () => {
 
         <footer className="mt-auto pt-4 border-t border-zinc-800">
            <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.4em] leading-relaxed text-center">
-              Batch Process Engine v2.5 • ScreenFrame
+              Batch Process Engine v3.1 • ScreenFrame
            </p>
         </footer>
       </aside>
@@ -617,7 +834,10 @@ const App: React.FC = () => {
                         showConfirm(
                           "Discard Master",
                           "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
-                          () => setState(prev => ({ ...prev, image: null })),
+                          () => {
+                            setState(prev => ({ ...prev, image: null }));
+                            setIsRevision(false);
+                          },
                           "Discard"
                         );
                       }}
@@ -635,80 +855,105 @@ const App: React.FC = () => {
             <header className="mb-12 flex items-end justify-between">
                <div>
                   <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic leading-none">Export Queue</h2>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-3">Immutable Canonical Viewport Snapshots</p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-3">Manual Reordering Active • Arrangement Sync Enabled</p>
                </div>
                <div className="flex gap-4 mb-1">
                   {isExporting && (
                      <div className="flex items-center gap-2 px-4 py-2 bg-blue-600/10 border border-blue-500/30 rounded-xl">
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
-                        <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Building ZIP Containers...</span>
+                        <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Compiling Kit...</span>
                      </div>
                   )}
                </div>
             </header>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {state.tray.map((item, idx) => (
-                <div key={idx} className="relative aspect-[9/16] bg-zinc-950 border border-zinc-900 rounded-[2.5rem] flex flex-col items-center justify-center overflow-hidden group">
-                  {item ? (
-                    <>
-                      <div className="absolute inset-0 flex items-center justify-center p-6">
-                         <img 
-                            src={item.renderedImageUrl} 
-                            alt={`Screenshot ${idx + 1}`} 
-                            className="max-w-full max-h-full object-contain rounded-[1.5rem] shadow-2xl"
-                         />
-                      </div>
-                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
-                        <div className="mb-4">
-                           <span className="block text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">{item.platform}</span>
-                           <span className="block text-[10px] font-black text-white uppercase tracking-widest">{DEVICE_SPECS[item.deviceType].name}</span>
+              {state.tray.map((item, idx) => {
+                const primaryVariant = item?.variants[0];
+                const isBeingDragged = draggedSlotIdx === idx;
+                const isDropTarget = dropTargetIdx === idx && draggedSlotIdx !== idx;
+
+                return (
+                  <div 
+                    key={item?.id || `empty-${idx}`} 
+                    draggable={item !== null && !modal.isOpen}
+                    onDragStart={() => handleTrayDragStart(idx)}
+                    onDragOver={(e) => handleTrayDragOver(e, idx)}
+                    onDrop={(e) => handleTrayDrop(e, idx)}
+                    className={`relative aspect-[9/16] bg-zinc-950 border rounded-[2.5rem] flex flex-col items-center justify-center overflow-hidden transition-all duration-300 select-none ${isBeingDragged ? 'opacity-30 scale-95 border-blue-500/50 grayscale' : 'border-zinc-900'} ${isDropTarget ? 'border-blue-500 scale-[1.02] shadow-[0_0_40px_rgba(59,130,246,0.2)]' : ''} ${item ? 'cursor-grab active:cursor-grabbing hover:border-zinc-700' : ''}`}
+                  >
+                    {item ? (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
+                           <img 
+                              src={primaryVariant?.renderedImageUrl} 
+                              alt={`Slot ${idx + 1}`} 
+                              className="max-w-full max-h-full object-contain rounded-[1.5rem] shadow-2xl"
+                           />
                         </div>
-                        <div className="text-[9px] font-mono text-zinc-400 mb-6 truncate max-w-full px-2">
-                           {item.filename}
+                        <div className="absolute inset-0 bg-black/80 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
+                          <div className="mb-2">
+                             <span className="block text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">{item.platform}</span>
+                             <span className="block text-[10px] font-black text-white uppercase tracking-widest">{item.exportMode === ExportMode.RECTANGLE ? 'Full Resolution' : 'Mockup Kit'}</span>
+                          </div>
+                          
+                          <div className="flex flex-col gap-2 w-full px-4">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                editCopyFromTray(item.id);
+                              }}
+                              className="w-full py-2 bg-white text-black text-[9px] font-black uppercase rounded-xl hover:bg-zinc-200 transition-colors shadow-lg"
+                            >
+                              EDIT REVISION
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFromTrayById(item.id);
+                              }}
+                              className="w-full py-2 bg-red-600/20 text-red-500 border border-red-500/30 text-[9px] font-black uppercase rounded-xl hover:bg-red-600 hover:text-white transition-all"
+                            >
+                              REMOVE
+                            </button>
+                          </div>
+                          
+                          <div className="mt-4 text-[7px] font-black text-zinc-600 uppercase tracking-widest">
+                             Drag to reorder ZIP sequence.
+                          </div>
                         </div>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFromTrayById(item.id);
-                          }}
-                          className="px-6 py-2 bg-red-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-red-500 transition-colors shadow-xl"
-                        >
-                          REMOVE
-                        </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-4 text-zinc-800">
+                         <div className="w-16 h-16 rounded-3xl border-2 border-dashed border-zinc-800 flex items-center justify-center">
+                            <span className="text-xl font-black opacity-20">{idx + 1}</span>
+                         </div>
+                         <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Awaiting Snapshot</span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-4 text-zinc-800">
-                       <div className="w-16 h-16 rounded-3xl border-2 border-dashed border-zinc-800 flex items-center justify-center">
-                          <span className="text-xl font-black opacity-20">{idx + 1}</span>
-                       </div>
-                       <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Awaiting Snapshot</span>
+                    )}
+                    <div className={`absolute top-6 left-6 w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${isDropTarget ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
+                      <span className="text-[10px] font-black">{idx + 1}</span>
                     </div>
-                  )}
-                  <div className="absolute top-6 left-6 w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                    <span className="text-[10px] font-black text-zinc-600">{idx + 1}</span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <footer className="mt-16 pt-8 border-t border-zinc-900 text-center">
                <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.4em] leading-relaxed">
-                 Batch Processing Module Online • ZIP Generation Enabled
+                 Revision Workflow Enabled • Immutable Snapshot Protection Online
                </p>
             </footer>
           </div>
         )}
 
-        {/* Success Alert */}
         <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 transform ${showSuccess ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}>
            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl px-6 py-3 flex items-center gap-3 shadow-2xl backdrop-blur-3xl">
               <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                  <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
-                Batch export successful. Files saved.
+                Batch operation successful. Snapshot synced.
               </p>
            </div>
         </div>

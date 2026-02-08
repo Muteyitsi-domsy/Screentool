@@ -84,7 +84,7 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
                <button
                  key={c.hex}
                  onClick={() => { onColorChange?.(c.hex); setShowPicker(false); }}
-                 className={`w-4 h-4 rounded-full border border-white/20 transition-all hover:scale-125 hover:shadow-[0_0_10px_rgba(255,255,255,0.2)] ${frameColor === c.hex ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black' : ''}`}
+                 className={`w-4 h-4 rounded-full border border-white/20 transition-all hover:scale-125 hover:shadow-[0_0_100px_rgba(255,255,255,0.2)] ${frameColor === c.hex ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black' : ''}`}
                  style={{ backgroundColor: c.hex }}
                  title={c.name}
                />
@@ -93,7 +93,10 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
         )}
 
         {image ? (
-          <div className={`w-full h-full relative overflow-hidden transition-all duration-500 ${isTablet ? 'rounded-[0.8rem]' : 'rounded-[1.8rem]'}`}>
+          <div 
+            className={`w-full h-full relative overflow-hidden transition-all duration-500 ${isTablet ? 'rounded-[0.8rem]' : 'rounded-[1.8rem]'}`}
+            style={spec.id === DeviceType.IPAD ? { transform: 'scale(0.92)', transformOrigin: 'center' } : {}}
+          >
             <img 
               src={image} 
               alt="Screenshot" 

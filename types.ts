@@ -54,17 +54,30 @@ export interface DeviceSpec {
   isTablet?: boolean;
 }
 
+export interface TrayVariant {
+  deviceType: DeviceType;
+  renderedImageUrl: string;
+  renderedBlob: Blob;
+  filename: string;
+}
+
 export interface TrayItem {
   id: string;
-  renderedImageUrl: string; // Pre-rendered immutable preview
-  renderedBlob: Blob;       // High-res immutable export asset
   platform: Platform;
-  deviceType: DeviceType;
   exportMode: ExportMode;
-  index: number;            // 1-8 slot assignment
-  filename: string;         // Precomputed naming convention
+  index: number;            // Sequential counter per platform/mode bucket
   timestamp: number;
-  frameColor: string;       // Hex code of the hardware finish
+  frameColor: string;
+  variants: TrayVariant[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  tray: (TrayItem | null)[];
 }
 
 export interface ProcessingState {

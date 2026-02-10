@@ -37,12 +37,28 @@ const AUTO_SHINE_PRESET: ImageAdjustments = {
 
 interface ModalState {
   isOpen: boolean;
-  type?: 'confirm' | 'save' | 'load' | 'alert';
+  type?: 'confirm' | 'save' | 'load' | 'alert' | 'upgrade' | 'early-access';
   title: string;
   message: string;
   onConfirm: (data?: any) => void;
   confirmLabel?: string;
+  secondaryLabel?: string;
 }
+
+const InfoTooltip: React.FC<{ className?: string }> = ({ className = "" }) => (
+  <div className={`group relative inline-flex items-center ml-1.5 align-middle ${className}`}>
+    <div className="w-3.5 h-3.5 rounded-full border border-zinc-700 flex items-center justify-center text-[8px] font-black text-zinc-500 cursor-help group-hover:border-zinc-500 group-hover:text-zinc-300 transition-colors">
+      i
+    </div>
+    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 z-[110]">
+      <p className="text-[9px] font-bold text-zinc-300 leading-relaxed uppercase tracking-wider text-center">
+        ScreenFrame is designed to help you prepare screenshots that align with current App Store and Play Store guidelines. 
+        Final approval always depends on the store review process.
+      </p>
+      <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-900"></div>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [state, setState] = useState<ProcessingState>({
@@ -54,7 +70,8 @@ const App: React.FC = () => {
     cropArea: { x: 0, y: 0, width: 100, height: 100 },
     adjustments: { ...NEUTRAL_BASELINE },
     activeView: AppView.EDITOR,
-    tray: Array(8).fill(null)
+    tray: Array(8).fill(null),
+    isPro: false // Simulated licensing state
   });
   
   const [modal, setModal] = useState<ModalState>({
@@ -74,6 +91,15 @@ const App: React.FC = () => {
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const [isRevision, setIsRevision] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Non-UI Admin Check
+  const isAdmin = useCallback(() => {
+    try {
+      return localStorage.getItem('SF_ADMIN_BYPASS') === 'true';
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     if (showSuccess) {
@@ -111,6 +137,35 @@ const App: React.FC = () => {
     });
   };
 
+  const showEarlyAccessModal = () => {
+    setModal({
+      isOpen: true,
+      type: 'early-access',
+      title: 'Payments opening soon',
+      message: 'We’re finishing payment setup. If you’d like early access or want to be notified when upgrades open, get in touch and we’ll help you get started.',
+      onConfirm: () => {
+        window.location.href = "mailto:support@screenframe.app?subject=Early Access Inquiry";
+      },
+      confirmLabel: "Contact for early access",
+      secondaryLabel: "Close"
+    });
+  };
+
+  const showUpgradeModal = () => {
+    setModal({
+      isOpen: true,
+      type: 'upgrade',
+      title: 'Ready to build a full screenshot set?',
+      message: 'Free includes 1 screenshot so you can try ScreenFrame. Upgrade to prepare a complete App Store or Play Store listing with up to 8 screenshots, proper ordering, and reusable projects.',
+      onConfirm: () => {
+        // Instead of directly upgrading, show the coming soon modal
+        showEarlyAccessModal();
+      },
+      confirmLabel: "Upgrade – Individual",
+      secondaryLabel: "Continue with 1 screenshot"
+    });
+  };
+
   const showSaveModal = () => {
     setModal({
       isOpen: true,
@@ -143,6 +198,14 @@ const App: React.FC = () => {
       title: 'Open Project',
       message: 'Loading a project will replace your current tray. The editor will remain blank.',
       onConfirm: (project: Project) => {
+        // HARD DATA GUARD: Prevent loading projects that exceed tier limits
+        const occupiedCount = project.tray.filter(x => x !== null).length;
+        // ADMIN BYPASS CHECK
+        if (!state.isPro && !isAdmin() && occupiedCount > 1) {
+          showUpgradeModal();
+          return;
+        }
+
         state.tray.forEach(item => {
           item?.variants.forEach(v => URL.revokeObjectURL(v.renderedImageUrl));
         });
@@ -264,8 +327,6 @@ const App: React.FC = () => {
             width: normalizationRect.width - (insetW * 2),
             height: normalizationRect.height - (insetH * 2)
           };
-        } else if (targetSpec.platform === Platform.ANDROID) {
-          console.debug("Android Canonical Normalization complete.");
         }
         
         const cleanAsset = createCanonicalAsset(img, normalizationRect);
@@ -283,8 +344,17 @@ const App: React.FC = () => {
   };
 
   const addToTray = async () => {
+    // HARD DATA GUARD: Final tier-check inside mutation logic. 
+    // This must precede all processing or UI state changes.
+    const currentTrayCount = state.tray.filter(x => x !== null).length;
+    // ADMIN BYPASS CHECK
+    if (!state.isPro && !isAdmin() && currentTrayCount >= 1) {
+      showUpgradeModal();
+      return;
+    }
+
     if (!state.image || isAddingToTray) return;
-    
+
     const emptySlotIndex = state.tray.findIndex(slot => slot === null);
     if (emptySlotIndex === -1) {
       alert("Export Tray is full. Please remove an item first.");
@@ -480,6 +550,7 @@ const App: React.FC = () => {
   );
 
   const isTrayView = state.activeView === AppView.TRAY;
+  const isFAQView = state.activeView === AppView.FAQ;
   const hasItems = state.tray.some(x => x !== null);
   const hasApple = state.tray.some(x => x?.platform === Platform.APPLE);
   const hasAndroid = state.tray.some(x => x?.platform === Platform.ANDROID);
@@ -537,15 +608,7 @@ const App: React.FC = () => {
                </div>
              )}
 
-             <div className="flex gap-3 shrink-0">
-                {modal.type !== 'alert' && (
-                  <button 
-                    onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
-                    className="flex-1 py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
-                  >
-                    Cancel
-                  </button>
-                )}
+             <div className="flex flex-col gap-3 shrink-0">
                 <button 
                   onClick={() => {
                     if (modal.type === 'save') {
@@ -555,10 +618,18 @@ const App: React.FC = () => {
                       modal.onConfirm();
                     }
                   }}
-                  className="flex-1 py-3 text-[10px] font-black text-white uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-2xl transition-all shadow-lg shadow-blue-500/20"
+                  className="w-full py-3 text-[10px] font-black text-white uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-2xl transition-all shadow-lg shadow-blue-500/20"
                 >
                   {modal.confirmLabel || "Confirm"}
                 </button>
+                {modal.type !== 'alert' && (
+                  <button 
+                    onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
+                    className="w-full py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
+                  >
+                    {modal.secondaryLabel || "Cancel"}
+                  </button>
+                )}
              </div>
           </div>
         </div>
@@ -570,25 +641,36 @@ const App: React.FC = () => {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black text-sm">SF</div>
             <h1 className="text-xl font-bold tracking-tight text-white italic">ScreenFrame</h1>
           </div>
-          <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em]">Asset Studio</p>
+          <div className="flex items-center">
+            <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em]">Asset Studio</p>
+            <InfoTooltip />
+          </div>
         </header>
 
-        <nav className="flex bg-zinc-950 p-1 rounded-2xl border border-zinc-800">
+        <nav className="flex flex-col bg-zinc-950 p-1 rounded-2xl border border-zinc-800 gap-1">
+          <div className="flex gap-1">
+            <button 
+              onClick={() => setState(prev => ({ ...prev, activeView: AppView.EDITOR }))}
+              className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.EDITOR ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              EDITOR
+            </button>
+            <button 
+              onClick={() => setState(prev => ({ ...prev, activeView: AppView.TRAY }))}
+              className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.TRAY ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              TRAY ({state.tray.filter(x => x !== null).length})
+            </button>
+          </div>
           <button 
-            onClick={() => setState(prev => ({ ...prev, activeView: AppView.EDITOR }))}
-            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${!isTrayView ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+            onClick={() => setState(prev => ({ ...prev, activeView: AppView.FAQ }))}
+            className={`w-full py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.FAQ ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
-            EDITOR
-          </button>
-          <button 
-            onClick={() => setState(prev => ({ ...prev, activeView: AppView.TRAY }))}
-            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${isTrayView ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-          >
-            TRAY ({state.tray.filter(x => x !== null).length})
+            PRICING & FAQ
           </button>
         </nav>
 
-        {!isTrayView ? (
+        {state.activeView === AppView.EDITOR && (
           <>
             {isRevision && (
               <div className="p-4 bg-blue-600/10 border border-blue-500/20 rounded-2xl space-y-2 animate-in slide-in-from-top-4 duration-500">
@@ -634,6 +716,11 @@ const App: React.FC = () => {
                 )}
                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">Add Snapshot to Tray</span>
               </button>
+              {!state.isPro && (
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center mt-2">
+                  Free: 1 Snapshot Allowed • {state.tray.filter(x => x !== null).length}/1 Active
+                </p>
+              )}
             </section>
 
             <section className="bg-zinc-950/50 rounded-2xl p-5 border border-zinc-800/50 space-y-5 shadow-inner">
@@ -690,27 +777,11 @@ const App: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Composition Style</label>
-                <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-                  <button 
-                    onClick={() => setState(prev => ({ ...prev, exportMode: ExportMode.RECTANGLE }))}
-                    className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.exportMode === ExportMode.RECTANGLE ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    FULL
-                  </button>
-                  <button 
-                    onClick={() => setState(prev => ({ ...prev, exportMode: ExportMode.FRAME }))}
-                    className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.exportMode === ExportMode.FRAME ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  >
-                    MOCKUP
-                  </button>
-                </div>
-              </div>
             </div>
           </>
-        ) : (
+        )}
+
+        {state.activeView === AppView.TRAY && (
           <div className="space-y-6">
             <section className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Project Management</label>
@@ -735,44 +806,39 @@ const App: React.FC = () => {
 
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Batch Operations</label>
-              
               <button 
                 disabled={!hasApple || !!isExporting}
                 onClick={() => handleBatchExport(Platform.APPLE)}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasApple ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-white text-black hover:bg-zinc-100 active:scale-95 shadow-xl'}`}
               >
-                {isExporting === Platform.APPLE ? (
-                   <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-                )}
+                {isExporting === Platform.APPLE ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
                 EXPORT APPLE KIT
               </button>
-
               <button 
                 disabled={!hasAndroid || !!isExporting}
                 onClick={() => handleBatchExport(Platform.ANDROID)}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasAndroid ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95 shadow-md shadow-black/50'}`}
               >
-                {isExporting === Platform.ANDROID ? (
-                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-                )}
+                {isExporting === Platform.ANDROID ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
                 EXPORT ANDROID KIT
               </button>
             </div>
-
-            <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-zinc-400">Captured Shots</span>
-                <span className="text-[10px] font-mono text-white">{state.tray.filter(x => x !== null).length}/8</span>
-              </div>
-              <p className="text-[9px] text-zinc-600 leading-relaxed font-bold uppercase tracking-widest">
-                Drag and drop snapshots to reorder your kit's presentation and ZIP sequence.
-              </p>
-            </div>
           </div>
+        )}
+
+        {state.activeView === AppView.FAQ && (
+           <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Licensing Status</label>
+              <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between">
+                 <span className="text-[10px] font-black text-white uppercase tracking-widest">{state.isPro ? 'Individual – Active' : 'Free Tier'}</span>
+                 <button 
+                  onClick={() => setState(prev => ({ ...prev, isPro: !prev.isPro }))}
+                  className="px-3 py-1 bg-zinc-800 text-[8px] font-black text-zinc-400 rounded-lg hover:text-white"
+                 >
+                   TOGGLE SIM
+                 </button>
+              </div>
+           </div>
         )}
 
         <footer className="mt-auto pt-4 border-t border-zinc-800">
@@ -783,7 +849,7 @@ const App: React.FC = () => {
       </aside>
 
       <main className={`flex-1 relative flex flex-col items-center justify-center ${isCropMode ? 'p-0' : 'p-4 md:p-8'} bg-[#0d0d0d] overflow-hidden`}>
-        {!isTrayView ? (
+        {state.activeView === AppView.EDITOR && (
           <>
             {!state.image && (
               <div 
@@ -850,21 +916,23 @@ const App: React.FC = () => {
               )}
             </div>
           </>
-        ) : (
-          <div className="w-full h-full max-w-6xl p-8 overflow-y-auto">
+        )}
+
+        {state.activeView === AppView.TRAY && (
+          <div className="w-full h-full max-w-6xl p-8 overflow-y-auto scrollbar-hide">
             <header className="mb-12 flex items-end justify-between">
                <div>
                   <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic leading-none">Export Queue</h2>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-3">Manual Reordering Active • Arrangement Sync Enabled</p>
+                  <div className="flex items-center mt-3">
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">Manual Reordering Active • Arrangement Sync Enabled</p>
+                    <InfoTooltip />
+                  </div>
                </div>
-               <div className="flex gap-4 mb-1">
-                  {isExporting && (
-                     <div className="flex items-center gap-2 px-4 py-2 bg-blue-600/10 border border-blue-500/30 rounded-xl">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
-                        <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">Compiling Kit...</span>
-                     </div>
-                  )}
-               </div>
+               {!state.isPro && !isAdmin() && (
+                 <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Free Mode: 1 Slot Max</span>
+                 </div>
+               )}
             </header>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -896,30 +964,9 @@ const App: React.FC = () => {
                              <span className="block text-[8px] font-black text-blue-400 uppercase tracking-widest mb-1">{item.platform}</span>
                              <span className="block text-[10px] font-black text-white uppercase tracking-widest">{item.exportMode === ExportMode.RECTANGLE ? 'Full Resolution' : 'Mockup Kit'}</span>
                           </div>
-                          
                           <div className="flex flex-col gap-2 w-full px-4">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                editCopyFromTray(item.id);
-                              }}
-                              className="w-full py-2 bg-white text-black text-[9px] font-black uppercase rounded-xl hover:bg-zinc-200 transition-colors shadow-lg"
-                            >
-                              EDIT REVISION
-                            </button>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFromTrayById(item.id);
-                              }}
-                              className="w-full py-2 bg-red-600/20 text-red-500 border border-red-500/30 text-[9px] font-black uppercase rounded-xl hover:bg-red-600 hover:text-white transition-all"
-                            >
-                              REMOVE
-                            </button>
-                          </div>
-                          
-                          <div className="mt-4 text-[7px] font-black text-zinc-600 uppercase tracking-widest">
-                             Drag to reorder ZIP sequence.
+                            <button onClick={(e) => { e.stopPropagation(); editCopyFromTray(item.id); }} className="w-full py-2 bg-white text-black text-[9px] font-black uppercase rounded-xl hover:bg-zinc-200 transition-colors shadow-lg">EDIT REVISION</button>
+                            <button onClick={(e) => { e.stopPropagation(); removeFromTrayById(item.id); }} className="w-full py-2 bg-red-600/20 text-red-500 border border-red-500/30 text-[9px] font-black uppercase rounded-xl hover:bg-red-600 hover:text-white transition-all">REMOVE</button>
                           </div>
                         </div>
                       </>
@@ -938,12 +985,99 @@ const App: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+        )}
 
-            <footer className="mt-16 pt-8 border-t border-zinc-900 text-center">
-               <p className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.4em] leading-relaxed">
-                 Revision Workflow Enabled • Immutable Snapshot Protection Online
-               </p>
-            </footer>
+        {state.activeView === AppView.FAQ && (
+          <div className="w-full h-full max-w-4xl p-8 overflow-y-auto bg-[#0a0a0a] scrollbar-hide">
+             <header className="mb-16">
+                <h2 className="text-4xl font-black tracking-tighter text-white uppercase italic leading-none mb-4">Pricing & FAQ</h2>
+                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] max-w-lg">
+                   Transparent plans for developers and teams. No forced subscriptions.
+                </p>
+             </header>
+
+             <section className="mb-20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-[2rem] flex flex-col items-start gap-4">
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Solo Developer</span>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Individual</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Lifetime license for single app production. One-time payment.</p>
+                      <div className="mt-auto pt-6 w-full">
+                         <div className="text-3xl font-black text-white mb-4 italic">$39<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Lifetime</span></div>
+                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Individual</button>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-zinc-950 border border-blue-600/30 rounded-[2rem] flex flex-col items-start gap-4 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-blue-600 text-white text-[8px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-widest">Most Popular</div>
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Agencies</span>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Studio</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Unlimited projects for agencies and multi-app teams. Priority specs.</p>
+                      <div className="mt-auto pt-6 w-full">
+                         <div className="text-3xl font-black text-white mb-1 italic">$19<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">/ month</span></div>
+                         <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mb-4">Or $180 / year</div>
+                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Start Subscription</button>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-[2rem] flex flex-col items-start gap-4">
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Enterprise</span>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Large Teams</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Custom invoicing, priority support, and team-wide seat management.</p>
+                      <div className="mt-auto pt-6 w-full">
+                         <div className="text-3xl font-black text-white mb-4 italic">Custom</div>
+                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-all">Contact us</button>
+                      </div>
+                   </div>
+                </div>
+             </section>
+
+             <div className="grid gap-12 pb-32">
+                <section className="space-y-4">
+                   <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest">Frequently Asked Questions</h3>
+                   <div className="grid gap-8">
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">How does ScreenFrame work?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">ScreenFrame lets you design your app screenshots once, then automatically prepares them for all required App Store and Play Store sizes. ScreenFrame focuses on preparing screenshots that align with current store guidelines, while final approval always depends on each store’s review process. You start by editing a single screenshot in the studio. When you add it to the tray, ScreenFrame generates all required device versions (for example, phone and tablet sizes) using the same layout and framing. Each screenshot added to the tray is treated as final and won’t change unless you deliberately revise it. You can reorder screenshots, export them as a complete set, or reopen saved projects later. The goal is simple: design once, export correctly, without manual resizing or guesswork.</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Is ScreenFrame free to use?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Yes. Free lets you generate one screenshot so you can see exactly how ScreenFrame works. This includes full device fan-out (e.g. phone, tablet) at production quality with no watermarks.</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">What does upgrading unlock?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Upgrading to an Individual or Studio license unlocks all 8 tray slots, enabling you to build a complete App Store or Play Store set in one batch. It also enables project saving/loading for future revisions.</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Do I need a subscription?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. The Individual license is a one-time lifetime payment. Studio and Enterprise plans are available for those who need ongoing team management or higher scale.</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Individual vs Studio vs Enterprise?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Individual is a one-time license for solo devs. Studio is a monthly subscription for agencies managing dozens of apps. Enterprise is for large organizations needing invoicing, multi-seat management, and dedicated support.</p>
+                      </div>
+                   </div>
+                </section>
+
+                <section className="space-y-4">
+                   <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest">Privacy & Determinism</h3>
+                   <div className="grid gap-8">
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Are my screenshots stored online?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. ScreenFrame is local-first. Your images and projects are stored in your browser's IndexedDB. We never see your assets unless you explicitly choose to sync to our optional cloud backup (Studio/Enterprise only).</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Will my exports change later?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. Exports are deterministic renders of your approved state. Once a capture is in the tray, its pixels are frozen. We don't apply "auto-adjustments" at export time.</p>
+                      </div>
+                      <div>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Is ScreenFrame affiliated with Apple or Google?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. ScreenFrame is an independent tool built by developers for developers. We track store requirement changes and update our device specs to ensure your kits remain compliant.</p>
+                      </div>
+                   </div>
+                </section>
+             </div>
           </div>
         )}
 
@@ -953,7 +1087,7 @@ const App: React.FC = () => {
                  <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
-                Batch operation successful. Snapshot synced.
+                Process updated. Licensing state synchronized.
               </p>
            </div>
         </div>

@@ -27,7 +27,8 @@ export enum ExportMode {
 
 export enum AppView {
   EDITOR = 'EDITOR',
-  TRAY = 'TRAY'
+  TRAY = 'TRAY',
+  FAQ = 'FAQ'
 }
 
 export interface CropArea {
@@ -90,4 +91,5 @@ export interface ProcessingState {
   adjustments: ImageAdjustments;
   activeView: AppView;
   tray: (TrayItem | null)[];
+  isPro: boolean;
 }

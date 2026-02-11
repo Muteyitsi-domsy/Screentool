@@ -1204,7 +1204,7 @@ const App: React.FC = () => {
                 <section className="space-y-4">
                   <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">14. Governing Law</h3>
                   <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    These Terms shall be governed and construed in accordance with the laws of the United States, without regard to its conflict of law provisions.
+                    These Terms shall be governed and construed in accordance with the laws of Kenya, without regard to its conflict of law provisions.
                   </p>
                 </section>
 

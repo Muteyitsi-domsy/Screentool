@@ -662,20 +662,12 @@ const App: React.FC = () => {
               TRAY ({state.tray.filter(x => x !== null).length})
             </button>
           </div>
-          <div className="flex gap-1">
-            <button 
-              onClick={() => setState(prev => ({ ...prev, activeView: AppView.FAQ }))}
-              className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.FAQ ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              PRICING & FAQ
-            </button>
-            <button 
-              onClick={() => setState(prev => ({ ...prev, activeView: AppView.TERMS }))}
-              className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.TERMS ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              TERMS
-            </button>
-          </div>
+          <button
+            onClick={() => setState(prev => ({ ...prev, activeView: AppView.FAQ }))}
+            className={`w-full py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.FAQ ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            PRICING & FAQ
+          </button>
         </nav>
 
         {state.activeView === AppView.EDITOR && (
@@ -852,6 +844,11 @@ const App: React.FC = () => {
         <footer className="mt-auto pt-4 border-t border-zinc-800">
            <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.4em] leading-relaxed text-center">
               Batch Process Engine v3.1 • ScreenFrame
+           </p>
+           <p className="text-[8px] text-zinc-600 font-medium text-center mt-2">
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Terms of Service</a>
+              {' • '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Privacy Policy</a>
            </p>
         </footer>
       </aside>
@@ -1085,134 +1082,6 @@ const App: React.FC = () => {
                       </div>
                    </div>
                 </section>
-             </div>
-          </div>
-        )}
-
-        {state.activeView === AppView.TERMS && (
-          <div className="w-full h-full max-w-4xl p-8 overflow-y-auto bg-[#0a0a0a] scrollbar-hide">
-             <header className="mb-16">
-                <h2 className="text-4xl font-black tracking-tighter text-white uppercase italic leading-none mb-4">Terms of Service</h2>
-                <p className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em] max-w-lg leading-loose">
-                   Last Updated: {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                </p>
-             </header>
-
-             <div className="space-y-16 pb-32">
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">1. Introduction</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    Welcome to ScreenFrame. These Terms of Service ("Terms") govern your use of the ScreenFrame web application and related services (the "Service"). By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, please do not use the Service.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">2. Description of the Service</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    ScreenFrame is a web-based screenshot formatting tool that allows users to upload screenshots and automatically frame, resize, and format them for professional presentation in app store listings. ScreenFrame utilizes a "local-first" architecture; all image processing and project storage occur locally within your browser's IndexedDB. We do not permanently store your screenshots on our servers unless you explicitly choose to enable optional cloud features.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">3. User Accounts</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    While basic features are available without an account, certain premium features (such as multiple tray slots or project syncing) may require the purchase of a license or subscription. You are responsible for maintaining the confidentiality of any license keys or account credentials and for all activities that occur under your account.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">4. Acceptable Use</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    You agree not to use the Service for any unlawful purpose or in any way that violates these Terms. Prohibited activities include, but are not limited to: uploading content that infringes on intellectual property rights, distributing malware, attempting to reverse engineer the Service, or interfering with the Service's integrity.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">5. Intellectual Property</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    You retain full ownership of all images you upload to the Service. ScreenFrame does not claim any rights to your assets. ScreenFrame and its original content, features, and functionality are and will remain the exclusive property of ScreenFrame and its licensors.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">6. Payment Terms</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    All payments for ScreenFrame are processed by **Paddle** as our Merchant of Record. Paddle handles all customer service inquiries and returns related to payments. By making a purchase, you agree to Paddle's terms and conditions in addition to these Terms.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">7. Refund Policy</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    We offer a 14-day refund policy for our digital goods. If you are unsatisfied with your purchase, you may request a refund within 14 days of the original transaction date, provided the license has not been excessively utilized. All refund requests are handled via Paddle.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">8. Subscription Terms</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    Subscriptions are billed on a recurring monthly or annual basis as selected during checkout. Subscriptions automatically renew unless canceled at least 24 hours before the end of the current period. You can manage and cancel your subscriptions through the billing portal provided by Paddle.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">9. Termination</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    We may terminate or suspend your access to the Service immediately, without prior notice or liability, for any reason, including if you breach these Terms. Upon termination, your right to use the Service will cease immediately.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">10. Disclaimer of Warranties</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium italic">
-                    The Service is provided on an "AS IS" and "AS AVAILABLE" basis. ScreenFrame makes no representations or warranties of any kind, express or implied, as to the operation of the Service. ScreenFrame focuses on preparing screenshots that align with store guidelines; however, final approval always depends on each store’s review process. We do not guarantee store acceptance.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">11. Limitation of Liability</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    In no event shall ScreenFrame, its directors, employees, or partners be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">12. Privacy Policy</h3>
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2">Data Collection</h4>
-                      <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">We collect minimal data: your email address for licensing purposes, payment details (processed securely by Paddle), and basic technical logs. We do not track the content of your screenshots.</p>
-                    </div>
-                    <div>
-                      <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2">Usage & Cookies</h4>
-                      <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">We use essential cookies to maintain your session and licensing status. We utilize third-party services like Vercel for hosting and Paddle for payments.</p>
-                    </div>
-                    <div>
-                      <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2">User Rights</h4>
-                      <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Under GDPR guidelines, you have the right to access, correct, or delete your personal data. To exercise these rights, please contact us at support@screenframe.app.</p>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">13. Changes to Terms</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    We reserve the right to modify these Terms at any time. We will notify you of any changes by updating the "Last Updated" date at the top of this page. Your continued use of the Service after changes are posted constitutes your acceptance of the new Terms.
-                  </p>
-                </section>
-
-                <section className="space-y-4">
-                  <h3 className="text-xs font-black text-blue-500 uppercase tracking-[0.2em]">14. Governing Law</h3>
-                  <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">
-                    These Terms shall be governed and construed in accordance with the laws of Kenya, without regard to its conflict of law provisions.
-                  </p>
-                </section>
-
-                <div className="pt-10 border-t border-zinc-800">
-                  <p className="text-[10px] text-zinc-600 font-black uppercase tracking-widest text-center">
-                    Questions regarding these terms? <a href="mailto:support@screenframe.app" className="text-blue-500 hover:text-blue-400">Contact Support</a>
-                  </p>
-                </div>
              </div>
           </div>
         )}

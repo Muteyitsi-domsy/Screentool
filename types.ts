@@ -28,8 +28,7 @@ export enum ExportMode {
 export enum AppView {
   EDITOR = 'EDITOR',
   TRAY = 'TRAY',
-  FAQ = 'FAQ',
-  TERMS = 'TERMS'
+  FAQ = 'FAQ'
 }
 
 export interface CropArea {

@@ -846,9 +846,11 @@ const App: React.FC = () => {
               Batch Process Engine v3.1 • ScreenFrame
            </p>
            <p className="text-[8px] text-zinc-600 font-medium text-center mt-2">
-              <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Terms of Service</a>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Terms</a>
               {' • '}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Privacy Policy</a>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Privacy</a>
+              {' • '}
+              <a href="mailto:support@screenframe.app" className="hover:text-zinc-400 transition-colors">Contact</a>
            </p>
         </footer>
       </aside>

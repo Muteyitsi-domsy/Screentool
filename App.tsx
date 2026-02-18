@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
 import { 
   Platform, 
@@ -37,13 +37,19 @@ const AUTO_SHINE_PRESET: ImageAdjustments = {
 
 interface ModalState {
   isOpen: boolean;
-  type?: 'confirm' | 'save' | 'load' | 'alert' | 'upgrade' | 'early-access';
+  type?: 'confirm' | 'save' | 'load' | 'alert' | 'upgrade' | 'early-access' | 'verify-passcode';
   title: string;
   message: string;
   onConfirm: (data?: any) => void;
   confirmLabel?: string;
   secondaryLabel?: string;
 }
+
+const hashPasscode = async (code: string): Promise<string> => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 
 const InfoTooltip: React.FC<{ className?: string }> = ({ className = "" }) => (
   <div className={`group relative inline-flex items-center ml-1.5 align-middle ${className}`}>
@@ -92,13 +98,43 @@ const App: React.FC = () => {
   const [isRevision, setIsRevision] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Non-UI Admin Check
-  const isAdmin = useCallback(() => {
-    try {
-      return localStorage.getItem('SF_ADMIN_BYPASS') === 'true';
-    } catch {
-      return false;
-    }
+  // Hidden admin shortcut: Ctrl+Shift+A
+  // Hash is baked into the bundle at build time via VITE_ADMIN_HASH (.env.local).
+  // Deleting browser storage has no effect — the reference hash lives in the bundle.
+  useEffect(() => {
+    const expectedHash = import.meta.env.VITE_ADMIN_HASH;
+    if (!expectedHash) return; // Admin access disabled if not configured
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+        setModal({
+          isOpen: true,
+          type: 'verify-passcode',
+          title: 'Admin Access',
+          message: 'Enter your 6-character passcode.',
+          confirmLabel: 'UNLOCK',
+          onConfirm: async (input?: string) => {
+            const code = (input ?? '').trim();
+            const hash = await hashPasscode(code);
+            if (hash === expectedHash) {
+              setState(prev => ({ ...prev, isPro: true }));
+              setModal(prev => ({ ...prev, isOpen: false }));
+            } else {
+              setModal({
+                isOpen: true,
+                type: 'alert',
+                title: 'Access Denied',
+                message: 'Incorrect passcode.',
+                onConfirm: () => setModal(prev => ({ ...prev, isOpen: false })),
+                confirmLabel: 'OK'
+              });
+            }
+          }
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   useEffect(() => {
@@ -200,8 +236,7 @@ const App: React.FC = () => {
       onConfirm: (project: Project) => {
         // HARD DATA GUARD: Prevent loading projects that exceed tier limits
         const occupiedCount = project.tray.filter(x => x !== null).length;
-        // ADMIN BYPASS CHECK
-        if (!state.isPro && !isAdmin() && occupiedCount > 1) {
+        if (!state.isPro && occupiedCount > 1) {
           showUpgradeModal();
           return;
         }
@@ -301,11 +336,11 @@ const App: React.FC = () => {
 
   const processFile = (file: File) => {
     if (file.size > 8 * 1024 * 1024) {
-      alert("File size exceeds 8MB limit.");
+      showAlert("Upload Error", "File size exceeds 8MB limit.");
       return;
     }
     if (!file.type.startsWith('image/')) {
-      alert("Please upload a valid image file.");
+      showAlert("Upload Error", "Please upload a valid image file.");
       return;
     }
     const reader = new FileReader();
@@ -344,11 +379,10 @@ const App: React.FC = () => {
   };
 
   const addToTray = async () => {
-    // HARD DATA GUARD: Final tier-check inside mutation logic. 
+    // HARD DATA GUARD: Final tier-check inside mutation logic.
     // This must precede all processing or UI state changes.
     const currentTrayCount = state.tray.filter(x => x !== null).length;
-    // ADMIN BYPASS CHECK
-    if (!state.isPro && !isAdmin() && currentTrayCount >= 1) {
+    if (!state.isPro && currentTrayCount >= 1) {
       showUpgradeModal();
       return;
     }
@@ -357,7 +391,7 @@ const App: React.FC = () => {
 
     const emptySlotIndex = state.tray.findIndex(slot => slot === null);
     if (emptySlotIndex === -1) {
-      alert("Export Tray is full. Please remove an item first.");
+      showAlert("Tray Full", "Export tray is full. Please remove an item first.");
       return;
     }
 
@@ -511,7 +545,7 @@ const App: React.FC = () => {
       setShowSuccess(true);
     } catch (err) {
       console.error("Batch crash:", err);
-      alert("Batch engine failed to build platform kit ZIP.");
+      showAlert("Export Error", "Batch engine failed to build platform kit ZIP.");
     } finally {
       setIsExporting(null);
     }
@@ -565,8 +599,8 @@ const App: React.FC = () => {
              
              {modal.type === 'save' && (
                <div className="mb-8">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Project Name..."
                     autoFocus
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-blue-500 transition-colors"
@@ -575,6 +609,23 @@ const App: React.FC = () => {
                     }}
                     id="project-name-input"
                   />
+               </div>
+             )}
+
+             {modal.type === 'verify-passcode' && (
+               <div className="mb-8">
+                 <input
+                   type="password"
+                   placeholder="6-character code"
+                   maxLength={6}
+                   autoFocus
+                   autoComplete="off"
+                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-blue-500 transition-colors tracking-[0.4em] text-center"
+                   onKeyDown={(e) => {
+                     if (e.key === 'Enter') modal.onConfirm((e.target as HTMLInputElement).value);
+                   }}
+                   id="passphrase-input"
+                 />
                </div>
              )}
 
@@ -613,6 +664,9 @@ const App: React.FC = () => {
                   onClick={() => {
                     if (modal.type === 'save') {
                       const input = document.getElementById('project-name-input') as HTMLInputElement;
+                      modal.onConfirm(input?.value);
+                    } else if (modal.type === 'verify-passcode') {
+                      const input = document.getElementById('passphrase-input') as HTMLInputElement;
                       modal.onConfirm(input?.value);
                     } else {
                       modal.onConfirm();
@@ -831,12 +885,6 @@ const App: React.FC = () => {
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Licensing Status</label>
               <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between">
                  <span className="text-[10px] font-black text-white uppercase tracking-widest">{state.isPro ? 'Individual – Active' : 'Free Tier'}</span>
-                 <button 
-                  onClick={() => setState(prev => ({ ...prev, isPro: !prev.isPro }))}
-                  className="px-3 py-1 bg-zinc-800 text-[8px] font-black text-zinc-400 rounded-lg hover:text-white"
-                 >
-                   TOGGLE SIM
-                 </button>
               </div>
            </div>
         )}
@@ -935,7 +983,7 @@ const App: React.FC = () => {
                     <InfoTooltip />
                   </div>
                </div>
-               {!state.isPro && !isAdmin() && (
+               {!state.isPro && (
                  <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Free Mode: 1 Slot Max</span>
                  </div>

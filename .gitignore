@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (never commit secrets)
+.env
+.env.*
+.env.local
+
+# Accidental Windows device name file
+nul
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

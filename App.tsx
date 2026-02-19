@@ -1,11 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
-import { 
-  Platform, 
-  DeviceType, 
-  FitMode, 
-  ExportMode, 
+import {
+  Platform,
+  DeviceType,
+  FitMode,
+  ExportMode,
   ProcessingState,
   CropArea,
   ImageAdjustments,
@@ -18,8 +18,11 @@ import {
 import { DEVICE_SPECS } from './constants';
 import DeviceMockup from './components/DeviceMockup';
 import CropEditor from './components/CropEditor';
+import AuthModal from './components/AuthModal';
 import { processImage, detectBorders } from './imageUtils';
 import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db';
+import { useAuth } from './hooks/useAuth';
+import { initPaddle, openPaddleCheckout } from './lib/paddle';
 
 const NEUTRAL_BASELINE: ImageAdjustments = {
   brightness: 100,
@@ -37,19 +40,15 @@ const AUTO_SHINE_PRESET: ImageAdjustments = {
 
 interface ModalState {
   isOpen: boolean;
-  type?: 'confirm' | 'save' | 'load' | 'alert' | 'upgrade' | 'early-access' | 'verify-passcode';
+  type?: 'confirm' | 'save' | 'load' | 'alert' | 'upgrade';
   title: string;
   message: string;
   onConfirm: (data?: any) => void;
   confirmLabel?: string;
   secondaryLabel?: string;
+  onSecondaryConfirm?: () => void;
+  secondaryConfirmLabel?: string;
 }
-
-const hashPasscode = async (code: string): Promise<string> => {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 
 const InfoTooltip: React.FC<{ className?: string }> = ({ className = "" }) => (
   <div className={`group relative inline-flex items-center ml-1.5 align-middle ${className}`}>
@@ -58,7 +57,7 @@ const InfoTooltip: React.FC<{ className?: string }> = ({ className = "" }) => (
     </div>
     <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl opacity-0 scale-95 pointer-events-none group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 z-[110]">
       <p className="text-[9px] font-bold text-zinc-300 leading-relaxed uppercase tracking-wider text-center">
-        ScreenFrame is designed to help you prepare screenshots that align with current App Store and Play Store guidelines. 
+        ScreenFrame is designed to help you prepare screenshots that align with current App Store and Play Store guidelines.
         Final approval always depends on the store review process.
       </p>
       <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-zinc-900"></div>
@@ -67,6 +66,8 @@ const InfoTooltip: React.FC<{ className?: string }> = ({ className = "" }) => (
 );
 
 const App: React.FC = () => {
+  const auth = useAuth();
+
   const [state, setState] = useState<ProcessingState>({
     image: null,
     fitMode: FitMode.FIT,
@@ -77,9 +78,9 @@ const App: React.FC = () => {
     adjustments: { ...NEUTRAL_BASELINE },
     activeView: AppView.EDITOR,
     tray: Array(8).fill(null),
-    isPro: false // Simulated licensing state
+    isPro: false
   });
-  
+
   const [modal, setModal] = useState<ModalState>({
     isOpen: false,
     title: '',
@@ -96,46 +97,36 @@ const App: React.FC = () => {
   const [draggedSlotIdx, setDraggedSlotIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const [isRevision, setIsRevision] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hidden admin shortcut: Ctrl+Shift+A
-  // Hash is baked into the bundle at build time via VITE_ADMIN_HASH (.env.local).
-  // Deleting browser storage has no effect — the reference hash lives in the bundle.
+  // Initialise Paddle once on mount
   useEffect(() => {
-    const expectedHash = import.meta.env.VITE_ADMIN_HASH;
-    if (!expectedHash) return; // Admin access disabled if not configured
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
-        setModal({
-          isOpen: true,
-          type: 'verify-passcode',
-          title: 'Admin Access',
-          message: 'Enter your 6-character passcode.',
-          confirmLabel: 'UNLOCK',
-          onConfirm: async (input?: string) => {
-            const code = (input ?? '').trim();
-            const hash = await hashPasscode(code);
-            if (hash === expectedHash) {
-              setState(prev => ({ ...prev, isPro: true }));
-              setModal(prev => ({ ...prev, isOpen: false }));
-            } else {
-              setModal({
-                isOpen: true,
-                type: 'alert',
-                title: 'Access Denied',
-                message: 'Incorrect passcode.',
-                onConfirm: () => setModal(prev => ({ ...prev, isOpen: false })),
-                confirmLabel: 'OK'
-              });
-            }
-          }
-        });
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    initPaddle();
   }, []);
+
+  // Sync server-authoritative isPro into local state
+  useEffect(() => {
+    if (!auth.loading) {
+      setState(prev => ({ ...prev, isPro: auth.isPro }));
+    }
+  }, [auth.isPro, auth.loading]);
+
+  // Handle post-OAuth redirect: open Paddle checkout if upgrade was pending
+  useEffect(() => {
+    if (!auth.loading && auth.user) {
+      const pending = sessionStorage.getItem('pendingUpgrade') as 'subscription' | 'lifetime' | null;
+      if (pending) {
+        sessionStorage.removeItem('pendingUpgrade');
+        setPendingUpgrade(null);
+        const priceId = pending === 'lifetime'
+          ? import.meta.env.VITE_PADDLE_PRICE_ID_LIFETIME
+          : import.meta.env.VITE_PADDLE_PRICE_ID_SUBSCRIPTION;
+        openPaddleCheckout(priceId, auth.user.email ?? undefined, auth.user.id);
+      }
+    }
+  }, [auth.user?.id, auth.loading]);
 
   useEffect(() => {
     if (showSuccess) {
@@ -173,18 +164,18 @@ const App: React.FC = () => {
     });
   };
 
-  const showEarlyAccessModal = () => {
-    setModal({
-      isOpen: true,
-      type: 'early-access',
-      title: 'Payments opening soon',
-      message: 'We’re finishing payment setup. If you’d like early access or want to be notified when upgrades open, get in touch and we’ll help you get started.',
-      onConfirm: () => {
-        window.location.href = "mailto:support@screenframe.app?subject=Early Access Inquiry";
-      },
-      confirmLabel: "Contact for early access",
-      secondaryLabel: "Close"
-    });
+  // Handles auth gating + Paddle checkout for a given plan
+  const handleUpgradeClick = (planType: 'subscription' | 'lifetime') => {
+    if (!auth.user) {
+      setPendingUpgrade(planType);
+      sessionStorage.setItem('pendingUpgrade', planType);
+      setShowAuthModal(true);
+    } else {
+      const priceId = planType === 'lifetime'
+        ? import.meta.env.VITE_PADDLE_PRICE_ID_LIFETIME
+        : import.meta.env.VITE_PADDLE_PRICE_ID_SUBSCRIPTION;
+      openPaddleCheckout(priceId, auth.user.email ?? undefined, auth.user.id);
+    }
   };
 
   const showUpgradeModal = () => {
@@ -194,10 +185,15 @@ const App: React.FC = () => {
       title: 'Ready to build a full screenshot set?',
       message: 'Free includes 1 screenshot so you can try ScreenFrame. Upgrade to prepare a complete App Store or Play Store listing with up to 8 screenshots, proper ordering, and reusable projects.',
       onConfirm: () => {
-        // Instead of directly upgrading, show the coming soon modal
-        showEarlyAccessModal();
+        setModal(prev => ({ ...prev, isOpen: false }));
+        handleUpgradeClick('subscription');
       },
-      confirmLabel: "Upgrade – Individual",
+      confirmLabel: "Subscribe – Individual",
+      onSecondaryConfirm: () => {
+        setModal(prev => ({ ...prev, isOpen: false }));
+        handleUpgradeClick('lifetime');
+      },
+      secondaryConfirmLabel: "Lifetime Access",
       secondaryLabel: "Continue with 1 screenshot"
     });
   };
@@ -288,7 +284,7 @@ const App: React.FC = () => {
 
     // Use primary variant as base for revision
     const primaryVariant = item.variants[0];
-    
+
     setState(prev => ({
       ...prev,
       image: primaryVariant.renderedImageUrl,
@@ -315,7 +311,7 @@ const App: React.FC = () => {
       case DeviceType.IPHONE_61: device = 'phone'; size = '6.1'; break;
       case DeviceType.IPAD: device = 'tablet'; size = '12.9'; break;
     }
-    
+
     const segments = [platform, device, size, modeLabel, idx].filter(s => s !== '');
     return `${segments.join('_')}.png`;
   };
@@ -350,7 +346,7 @@ const App: React.FC = () => {
       img.onload = () => {
         let normalizationRect = detectBorders(img);
         const targetSpec = DEVICE_SPECS[state.selectedDevice];
-        
+
         if (targetSpec.platform === Platform.APPLE) {
           const isModal = normalizationRect.width < 95 || normalizationRect.height < 95;
           const insetFactor = isModal ? 0.08 : 0.04;
@@ -363,10 +359,10 @@ const App: React.FC = () => {
             height: normalizationRect.height - (insetH * 2)
           };
         }
-        
+
         const cleanAsset = createCanonicalAsset(img, normalizationRect);
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           image: cleanAsset,
           cropArea: { x: 0, y: 0, width: 100, height: 100 },
           adjustments: { ...NEUTRAL_BASELINE }
@@ -381,6 +377,7 @@ const App: React.FC = () => {
   const addToTray = async () => {
     // HARD DATA GUARD: Final tier-check inside mutation logic.
     // This must precede all processing or UI state changes.
+    // First slot (index 0) is always free; second slot onwards requires Pro.
     const currentTrayCount = state.tray.filter(x => x !== null).length;
     if (!state.isPro && currentTrayCount >= 1) {
       showUpgradeModal();
@@ -400,17 +397,17 @@ const App: React.FC = () => {
     try {
       const activeSpec = DEVICE_SPECS[state.selectedDevice];
       const targetPlatform = activeSpec.platform;
-      
-      const bucketItems = state.tray.filter(item => 
-        item !== null && 
-        item.platform === targetPlatform && 
+
+      const bucketItems = state.tray.filter(item =>
+        item !== null &&
+        item.platform === targetPlatform &&
         item.exportMode === state.exportMode
       );
       const maxIndexInBucket = bucketItems.reduce((max, item) => Math.max(max, item!.index), 0);
       const calculatedIndex = maxIndexInBucket + 1;
 
       const targetSpecs = Object.values(DEVICE_SPECS).filter(s => s.platform === targetPlatform);
-      
+
       const variantPromises = targetSpecs.map(async (spec): Promise<TrayVariant> => {
         const renderedBlob = await processImage(
           state.image!,
@@ -423,7 +420,7 @@ const App: React.FC = () => {
         );
         const renderedImageUrl = URL.createObjectURL(renderedBlob);
         const filename = getExportFilename(spec, state.exportMode, calculatedIndex);
-        
+
         return {
           deviceType: spec.id,
           renderedImageUrl,
@@ -452,7 +449,7 @@ const App: React.FC = () => {
       setIsRevision(false);
     } catch (err) {
       console.error("Capture fan-out failure:", err);
-      alert("System Error: Failed to generate multi-device kit variants.");
+      showAlert("System Error", "Failed to generate multi-device kit variants.");
     } finally {
       setIsAddingToTray(false);
     }
@@ -463,8 +460,8 @@ const App: React.FC = () => {
     if (itemIndex === -1) return;
 
     showConfirm(
-      "Remove Screenshot", 
-      "Are you sure you want to remove this screenshot (and all its device variants) from the Export Tray?", 
+      "Remove Screenshot",
+      "Are you sure you want to remove this screenshot (and all its device variants) from the Export Tray?",
       () => {
         setState(prev => {
           const currentItem = prev.tray[itemIndex];
@@ -526,12 +523,12 @@ const App: React.FC = () => {
 
       trayItems.forEach(item => {
         const targetFolder = item.exportMode === ExportMode.RECTANGLE ? rectFolder : mockupFolder;
-        
+
         item.variants.forEach(variant => {
           targetFolder?.file(variant.filename, variant.renderedBlob);
         });
       });
-      
+
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
@@ -541,7 +538,7 @@ const App: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       setShowSuccess(true);
     } catch (err) {
       console.error("Batch crash:", err);
@@ -566,16 +563,22 @@ const App: React.FC = () => {
     }));
   };
 
+  // Called by AuthModal after successful email/password auth
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    // The useEffect watching auth.user will open Paddle checkout if pendingUpgrade is set
+  };
+
   const AdjustmentSlider = ({ label, value, min, max, property }: { label: string, value: number, min: number, max: number, property: keyof ImageAdjustments }) => (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center px-1">
         <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{label}</label>
         <span className="text-[10px] font-mono text-zinc-400">{value > 100 ? `+${value - 100}%` : value < 100 ? `-${100 - value}%` : '0%'}</span>
       </div>
-      <input 
-        type="range" 
-        min={min} 
-        max={max} 
+      <input
+        type="range"
+        min={min}
+        max={max}
         value={value}
         onChange={(e) => setState(prev => ({ ...prev, adjustments: { ...prev.adjustments, [property]: parseInt(e.target.value) } }))}
         className="w-full h-1 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-blue-500"
@@ -589,14 +592,38 @@ const App: React.FC = () => {
   const hasApple = state.tray.some(x => x?.platform === Platform.APPLE);
   const hasAndroid = state.tray.some(x => x?.platform === Platform.ANDROID);
 
+  const planLabel = () => {
+    if (!auth.profile) return state.isPro ? 'Individual – Active' : 'Free Tier';
+    if (auth.profile.plan_type === 'lifetime') return 'Lifetime – Active';
+    if (auth.profile.plan_type === 'subscription') {
+      if (auth.profile.subscription_status === 'active') return 'Individual – Active';
+      if (auth.profile.subscription_status === 'canceled') return 'Canceled';
+      if (auth.profile.subscription_status === 'paused') return 'Paused';
+    }
+    return 'Free Tier';
+  };
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a]">
+      {/* AuthModal — rendered outside the main modal to avoid z-index conflicts */}
+      {showAuthModal && (
+        <AuthModal
+          auth={auth}
+          onSuccess={handleAuthSuccess}
+          onClose={() => {
+            setShowAuthModal(false);
+            setPendingUpgrade(null);
+            sessionStorage.removeItem('pendingUpgrade');
+          }}
+        />
+      )}
+
       {modal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300 overflow-hidden flex flex-col max-h-[80vh]">
              <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4 shrink-0">{modal.title}</h3>
              <p className="text-zinc-400 text-[10px] font-black leading-relaxed mb-6 uppercase tracking-wider shrink-0">{modal.message}</p>
-             
+
              {modal.type === 'save' && (
                <div className="mb-8">
                   <input
@@ -612,27 +639,10 @@ const App: React.FC = () => {
                </div>
              )}
 
-             {modal.type === 'verify-passcode' && (
-               <div className="mb-8">
-                 <input
-                   type="password"
-                   placeholder="6-character code"
-                   maxLength={6}
-                   autoFocus
-                   autoComplete="off"
-                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-blue-500 transition-colors tracking-[0.4em] text-center"
-                   onKeyDown={(e) => {
-                     if (e.key === 'Enter') modal.onConfirm((e.target as HTMLInputElement).value);
-                   }}
-                   id="passphrase-input"
-                 />
-               </div>
-             )}
-
              {modal.type === 'load' && (
                <div className="flex-1 overflow-y-auto mb-8 pr-2 space-y-3 scrollbar-hide">
                  {savedProjects.length > 0 ? savedProjects.map(project => (
-                   <div 
+                   <div
                     key={project.id}
                     className="group relative flex items-center justify-between p-4 bg-zinc-950/50 border border-zinc-800 rounded-2xl hover:bg-zinc-800/50 transition-all cursor-pointer"
                     onClick={() => modal.onConfirm(project)}
@@ -641,7 +651,7 @@ const App: React.FC = () => {
                         <span className="block text-[10px] font-black text-white uppercase tracking-widest mb-1">{project.name}</span>
                         <span className="block text-[8px] font-black text-zinc-500 uppercase tracking-widest">{new Date(project.createdAt).toLocaleDateString()} • {project.tray.filter(x => x !== null).length} Items</span>
                      </div>
-                     <button 
+                     <button
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteProject(project.id);
@@ -660,13 +670,10 @@ const App: React.FC = () => {
              )}
 
              <div className="flex flex-col gap-3 shrink-0">
-                <button 
+                <button
                   onClick={() => {
                     if (modal.type === 'save') {
                       const input = document.getElementById('project-name-input') as HTMLInputElement;
-                      modal.onConfirm(input?.value);
-                    } else if (modal.type === 'verify-passcode') {
-                      const input = document.getElementById('passphrase-input') as HTMLInputElement;
                       modal.onConfirm(input?.value);
                     } else {
                       modal.onConfirm();
@@ -676,8 +683,17 @@ const App: React.FC = () => {
                 >
                   {modal.confirmLabel || "Confirm"}
                 </button>
+                {/* Upgrade modal: second action button (Lifetime Access) */}
+                {modal.type === 'upgrade' && modal.onSecondaryConfirm && (
+                  <button
+                    onClick={modal.onSecondaryConfirm}
+                    className="w-full py-3 text-[10px] font-black text-white uppercase tracking-widest bg-zinc-700 hover:bg-zinc-600 rounded-2xl transition-all"
+                  >
+                    {modal.secondaryConfirmLabel || "Lifetime Access"}
+                  </button>
+                )}
                 {modal.type !== 'alert' && (
-                  <button 
+                  <button
                     onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
                     className="w-full py-3 text-[10px] font-black text-zinc-400 uppercase tracking-widest bg-zinc-800/50 hover:bg-zinc-800 rounded-2xl transition-all"
                   >
@@ -691,9 +707,35 @@ const App: React.FC = () => {
 
       <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/20 p-6 flex flex-col gap-6 overflow-y-auto shrink-0 scrollbar-hide">
         <header>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black text-sm">SF</div>
-            <h1 className="text-xl font-bold tracking-tight text-white italic">ScreenFrame</h1>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-black text-sm">SF</div>
+              <h1 className="text-xl font-bold tracking-tight text-white italic">ScreenFrame</h1>
+            </div>
+            {/* Auth controls */}
+            {auth.loading ? (
+              <div className="w-4 h-4 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin"></div>
+            ) : auth.user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest truncate max-w-[80px]" title={auth.user.email ?? ''}>
+                  {auth.user.email?.split('@')[0]}
+                </span>
+                <button
+                  onClick={() => auth.signOut()}
+                  className="text-[8px] font-black text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors"
+                  title="Sign out"
+                >
+                  OUT
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="text-[8px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-colors"
+              >
+                Sign In
+              </button>
+            )}
           </div>
           <div className="flex items-center">
             <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em]">Asset Studio</p>
@@ -703,13 +745,13 @@ const App: React.FC = () => {
 
         <nav className="flex flex-col bg-zinc-950 p-1 rounded-2xl border border-zinc-800 gap-1">
           <div className="flex gap-1">
-            <button 
+            <button
               onClick={() => setState(prev => ({ ...prev, activeView: AppView.EDITOR }))}
               className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.EDITOR ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
               EDITOR
             </button>
-            <button 
+            <button
               onClick={() => setState(prev => ({ ...prev, activeView: AppView.TRAY }))}
               className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.TRAY ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
             >
@@ -741,7 +783,7 @@ const App: React.FC = () => {
             <section className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Precision Tools</label>
               <div className="grid grid-cols-2 gap-2">
-                <button 
+                <button
                   disabled={!state.image}
                   onClick={() => setIsCropMode(!isCropMode)}
                   className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all ${isCropMode ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800'} disabled:opacity-30`}
@@ -749,7 +791,7 @@ const App: React.FC = () => {
                   <svg className="w-5 h-5 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">Crop Area</span>
                 </button>
-                <button 
+                <button
                   disabled={!state.image}
                   onClick={applyAutoShine}
                   className="flex flex-col items-center justify-center p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 transition-all hover:border-blue-500 group disabled:opacity-30"
@@ -758,7 +800,7 @@ const App: React.FC = () => {
                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">Auto Shine</span>
                 </button>
               </div>
-              <button 
+              <button
                 disabled={!state.image || isAddingToTray}
                 onClick={addToTray}
                 className={`w-full flex items-center justify-center gap-2 py-4 mt-1 rounded-2xl border border-blue-500/40 bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 transition-all disabled:opacity-30 shadow-lg shadow-blue-500/5 ${isAddingToTray ? 'animate-pulse' : ''}`}
@@ -790,7 +832,7 @@ const App: React.FC = () => {
             <div className="space-y-5">
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Target Module</label>
-                <select 
+                <select
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 appearance-none"
                   value={state.selectedDevice}
                   onChange={(e) => setState(prev => ({ ...prev, selectedDevice: e.target.value as DeviceType }))}
@@ -811,19 +853,19 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Scaling Logic</label>
                 <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-                  <button 
+                  <button
                     onClick={() => setState(prev => ({ ...prev, fitMode: FitMode.FIT }))}
                     className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.fitMode === FitMode.FIT ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     FIT
                   </button>
-                  <button 
+                  <button
                     onClick={() => setState(prev => ({ ...prev, fitMode: FitMode.AUTOFIT }))}
                     className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.fitMode === FitMode.AUTOFIT ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     FILL
                   </button>
-                  <button 
+                  <button
                     onClick={() => setState(prev => ({ ...prev, fitMode: FitMode.STRETCH }))}
                     className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.fitMode === FitMode.STRETCH ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
@@ -840,7 +882,7 @@ const App: React.FC = () => {
             <section className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Project Management</label>
               <div className="grid grid-cols-2 gap-2">
-                <button 
+                <button
                   disabled={!hasItems}
                   onClick={showSaveModal}
                   className="flex flex-col items-center justify-center p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 transition-all hover:border-blue-500 disabled:opacity-30"
@@ -848,7 +890,7 @@ const App: React.FC = () => {
                   <svg className="w-5 h-5 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">Save Kit</span>
                 </button>
-                <button 
+                <button
                   onClick={showLoadModal}
                   className="flex flex-col items-center justify-center p-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 transition-all hover:border-blue-500"
                 >
@@ -860,7 +902,7 @@ const App: React.FC = () => {
 
             <div className="space-y-4">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Batch Operations</label>
-              <button 
+              <button
                 disabled={!hasApple || !!isExporting}
                 onClick={() => handleBatchExport(Platform.APPLE)}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasApple ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-white text-black hover:bg-zinc-100 active:scale-95 shadow-xl'}`}
@@ -868,7 +910,7 @@ const App: React.FC = () => {
                 {isExporting === Platform.APPLE ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
                 EXPORT APPLE KIT
               </button>
-              <button 
+              <button
                 disabled={!hasAndroid || !!isExporting}
                 onClick={() => handleBatchExport(Platform.ANDROID)}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasAndroid ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95 shadow-md shadow-black/50'}`}
@@ -883,8 +925,24 @@ const App: React.FC = () => {
         {state.activeView === AppView.FAQ && (
            <div className="space-y-4">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Licensing Status</label>
-              <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between">
-                 <span className="text-[10px] font-black text-white uppercase tracking-widest">{state.isPro ? 'Individual – Active' : 'Free Tier'}</span>
+              <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl flex items-center justify-between gap-3">
+                 <span className="text-[10px] font-black text-white uppercase tracking-widest">{planLabel()}</span>
+                 {!auth.user && (
+                   <button
+                     onClick={() => setShowAuthModal(true)}
+                     className="text-[8px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-colors shrink-0"
+                   >
+                     Sign In
+                   </button>
+                 )}
+                 {auth.user && !state.isPro && (
+                   <button
+                     onClick={() => showUpgradeModal()}
+                     className="text-[8px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest transition-colors shrink-0"
+                   >
+                     Upgrade
+                   </button>
+                 )}
               </div>
            </div>
         )}
@@ -907,7 +965,7 @@ const App: React.FC = () => {
         {state.activeView === AppView.EDITOR && (
           <>
             {!state.image && (
-              <div 
+              <div
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group transition-all"
               >
@@ -926,7 +984,7 @@ const App: React.FC = () => {
             <div className="w-full h-full flex items-center justify-center relative">
               {isCropMode && state.image ? (
                 <div className="w-full h-full">
-                   <CropEditor 
+                   <CropEditor
                     image={state.image}
                     cropArea={state.cropArea}
                     fitMode={state.fitMode}
@@ -938,7 +996,7 @@ const App: React.FC = () => {
                 </div>
               ) : (
                 <div className="relative scale-90 sm:scale-100 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]">
-                  <DeviceMockup 
+                  <DeviceMockup
                     deviceType={state.selectedDevice}
                     image={state.image}
                     exportMode={state.exportMode}
@@ -949,7 +1007,7 @@ const App: React.FC = () => {
                     onColorChange={(hex) => setState(prev => ({ ...prev, frameColor: hex }))}
                   />
                   {state.image && (
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         showConfirm(
@@ -997,8 +1055,8 @@ const App: React.FC = () => {
                 const isDropTarget = dropTargetIdx === idx && draggedSlotIdx !== idx;
 
                 return (
-                  <div 
-                    key={item?.id || `empty-${idx}`} 
+                  <div
+                    key={item?.id || `empty-${idx}`}
                     draggable={item !== null && !modal.isOpen}
                     onDragStart={() => handleTrayDragStart(idx)}
                     onDragOver={(e) => handleTrayDragOver(e, idx)}
@@ -1008,9 +1066,9 @@ const App: React.FC = () => {
                     {item ? (
                       <>
                         <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
-                           <img 
-                              src={primaryVariant?.renderedImageUrl} 
-                              alt={`Slot ${idx + 1}`} 
+                           <img
+                              src={primaryVariant?.renderedImageUrl}
+                              alt={`Slot ${idx + 1}`}
                               className="max-w-full max-h-full object-contain rounded-[1.5rem] shadow-2xl"
                            />
                         </div>
@@ -1060,7 +1118,7 @@ const App: React.FC = () => {
                       <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Lifetime license for single app production. One-time payment.</p>
                       <div className="mt-auto pt-6 w-full">
                          <div className="text-3xl font-black text-white mb-4 italic">$39<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Lifetime</span></div>
-                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Individual</button>
+                         <button onClick={() => handleUpgradeClick('lifetime')} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Individual</button>
                       </div>
                    </div>
 
@@ -1072,7 +1130,7 @@ const App: React.FC = () => {
                       <div className="mt-auto pt-6 w-full">
                          <div className="text-3xl font-black text-white mb-1 italic">$19<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">/ month</span></div>
                          <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mb-4">Or $180 / year</div>
-                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Start Subscription</button>
+                         <button onClick={() => handleUpgradeClick('subscription')} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Start Subscription</button>
                       </div>
                    </div>
 
@@ -1082,7 +1140,7 @@ const App: React.FC = () => {
                       <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Custom invoicing, priority support, and team-wide seat management.</p>
                       <div className="mt-auto pt-6 w-full">
                          <div className="text-3xl font-black text-white mb-4 italic">Custom</div>
-                         <button onClick={showEarlyAccessModal} className="w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-all">Contact us</button>
+                         <a href="mailto:support@screenframe.app?subject=Enterprise Inquiry" className="block w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-all text-center">Contact us</a>
                       </div>
                    </div>
                 </div>
@@ -1094,7 +1152,7 @@ const App: React.FC = () => {
                    <div className="grid gap-8">
                       <div>
                          <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">How does ScreenFrame work?</h4>
-                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">ScreenFrame lets you design your app screenshots once, then automatically prepares them for all required App Store and Play Store sizes. ScreenFrame focuses on preparing screenshots that align with current store guidelines, while final approval always depends on each store’s review process. You start by editing a single screenshot in the studio. When you add it to the tray, ScreenFrame generates all required device versions (for example, phone and tablet sizes) using the same layout and framing. Each screenshot added to the tray is treated as final and won’t change unless you deliberately revise it. You can reorder screenshots, export them as a complete set, or reopen saved projects later. The goal is simple: design once, export correctly, without manual resizing or guesswork.</p>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">ScreenFrame lets you design your app screenshots once, then automatically prepares them for all required App Store and Play Store sizes. ScreenFrame focuses on preparing screenshots that align with current store guidelines, while final approval always depends on each store's review process. You start by editing a single screenshot in the studio. When you add it to the tray, ScreenFrame generates all required device versions (for example, phone and tablet sizes) using the same layout and framing. Each screenshot added to the tray is treated as final and won't change unless you deliberately revise it. You can reorder screenshots, export them as a complete set, or reopen saved projects later. The goal is simple: design once, export correctly, without manual resizing or guesswork.</p>
                       </div>
                       <div>
                          <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Is ScreenFrame free to use?</h4>
@@ -1142,7 +1200,7 @@ const App: React.FC = () => {
                  <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="text-[10px] font-black text-white uppercase tracking-widest leading-none">
-                Process updated. Licensing state synchronized.
+                Exported successfully.
               </p>
            </div>
         </div>

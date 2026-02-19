@@ -7,6 +7,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import App from '../App';
 
+// ─── Module mocks ──────────────────────────────────────────────────────────
+// Mock Supabase auth + realtime so tests run without a live project
+vi.mock('../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    profile: null,
+    isPro: false,
+    loading: false,
+    signIn: vi.fn().mockResolvedValue({ error: null }),
+    signUp: vi.fn().mockResolvedValue({ error: null }),
+    signInWithGoogle: vi.fn().mockResolvedValue(undefined),
+    signOut: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
+// Mock Paddle so no external script is loaded in tests
+vi.mock('../lib/paddle', () => ({
+  initPaddle: vi.fn().mockResolvedValue(undefined),
+  openPaddleCheckout: vi.fn(),
+}));
+
 // Silence console.error for expected React warnings in test environment
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});

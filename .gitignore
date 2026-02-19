@@ -16,6 +16,8 @@ dist-ssr
 .env
 .env.*
 .env.local
+# Allow the example file — it contains no secrets, only variable names
+!.env.local.example
 
 # Accidental Windows device name file
 nul

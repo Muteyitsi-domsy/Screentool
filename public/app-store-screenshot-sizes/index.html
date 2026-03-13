@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Primary SEO -->
+  <title>App Store Screenshot Sizes (2026 Guide for iPhone &amp; Android)</title>
+  <meta name="description" content="The definitive 2026 reference for App Store and Google Play screenshot dimensions — iPhone sizes, Android requirements, common mistakes, and free templates." />
+  <meta name="keywords" content="App Store screenshot sizes, iPhone screenshot size for App Store, Google Play screenshot dimensions, App Store screenshot resolution, App Store screenshot requirements 2026" />
+  <link rel="canonical" href="https://screenframe.app/app-store-screenshot-sizes" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="App Store Screenshot Sizes (2026 Guide for iPhone &amp; Android)" />
+  <meta property="og:description" content="Current App Store and Google Play screenshot dimensions, size calculator, common mistakes, and free templates." />
+  <meta property="og:url" content="https://screenframe.app/app-store-screenshot-sizes" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Reset & Base ──────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0a0a0a;
+      --surface:     #141414;
+      --border:      #262626;
+      --text:        #e5e5e5;
+      --muted:       #737373;
+      --accent:      #6366f1;        /* indigo – primary brand colour */
+      --accent-2:    #a855f7;        /* purple – secondary */
+      --accent-dim:  rgba(99,102,241,.12);
+      --green:       #22c55e;
+      --red:         #ef4444;
+      --mono:        'JetBrains Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: #818cf8; text-decoration: none; }
+    a:hover { color: #a5b4fc; text-decoration: underline; }
+
+    img { max-width: 100%; display: block; }
+
+    /* ─── Layout ─────────────────────────────────────────── */
+    .page-wrap {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+
+    section { padding: 4rem 0; }
+    section + section { border-top: 1px solid var(--border); }
+
+    /* ─── Top nav ────────────────────────────────────────── */
+    .topnav {
+      background: rgba(10,10,10,.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topnav-inner {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: .85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .topnav-logo {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #fff;
+      letter-spacing: -.02em;
+    }
+    .topnav-logo span { color: var(--accent); }
+    .topnav-cta {
+      background: var(--accent);
+      color: #fff;
+      padding: .45rem 1rem;
+      border-radius: 6px;
+      font-size: .875rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .topnav-cta:hover { opacity: .85; text-decoration: none; }
+
+    /* ─── Hero ───────────────────────────────────────────── */
+    .hero {
+      padding: 5rem 0 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    /* subtle gradient glow behind hero */
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 400px;
+      background: radial-gradient(ellipse at center, rgba(99,102,241,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(99,102,241,.3);
+      border-radius: 99px;
+      padding: .3rem .85rem;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(1.9rem, 5vw, 2.9rem);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -.03em;
+      color: #fff;
+      margin-bottom: 1.1rem;
+    }
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.1rem;
+      color: #a3a3a3;
+      max-width: 600px;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.5rem;
+      border-radius: 8px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: .88; transform: translateY(-1px); text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .hero-btns { display: flex; flex-wrap: wrap; gap: .75rem; }
+
+    .hero-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .stat-item { }
+    .stat-num {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .stat-label { font-size: .825rem; color: var(--muted); }
+
+    /* ─── Section titles ─────────────────────────────────── */
+    h2 {
+      font-size: clamp(1.35rem, 3vw, 1.75rem);
+      font-weight: 700;
+      letter-spacing: -.025em;
+      color: #fff;
+      margin-bottom: .6rem;
+    }
+    .section-lead {
+      color: #a3a3a3;
+      margin-bottom: 2rem;
+      max-width: 620px;
+    }
+
+    /* ─── Overview pills ─────────────────────────────────── */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .overview-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem;
+    }
+    .overview-card-icon {
+      font-size: 1.4rem;
+      margin-bottom: .6rem;
+    }
+    .overview-card h3 {
+      font-size: .95rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: .25rem;
+    }
+    .overview-card p { font-size: .85rem; color: var(--muted); margin: 0; }
+
+    /* ─── Tables ─────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      margin-top: 1.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+    thead tr {
+      background: linear-gradient(90deg, rgba(99,102,241,.2), rgba(168,85,247,.2));
+    }
+    thead th {
+      padding: .85rem 1rem;
+      text-align: left;
+      font-size: .8rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: #c7d2fe;
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+    tbody td {
+      padding: .85rem 1rem;
+      color: var(--text);
+      vertical-align: top;
+    }
+    .badge {
+      display: inline-block;
+      padding: .2rem .55rem;
+      border-radius: 4px;
+      font-size: .75rem;
+      font-weight: 600;
+      font-family: var(--mono);
+    }
+    .badge-blue  { background: rgba(99,102,241,.18); color: #a5b4fc; }
+    .badge-green { background: rgba(34,197,94,.15);  color: #86efac; }
+    .badge-amber { background: rgba(245,158,11,.15); color: #fcd34d; }
+
+    /* ─── Tip box ────────────────────────────────────────── */
+    .tip-box {
+      background: rgba(99,102,241,.08);
+      border: 1px solid rgba(99,102,241,.25);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-top: 1.25rem;
+      font-size: .9rem;
+      color: #c7d2fe;
+    }
+    .tip-box strong { color: #fff; }
+
+    /* ─── Mistakes list ──────────────────────────────────── */
+    .mistakes-list {
+      display: grid;
+      gap: .85rem;
+      margin-top: 1.5rem;
+    }
+    .mistake-item {
+      display: flex;
+      gap: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+    }
+    .mistake-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      margin-top: .1rem;
+    }
+    .mistake-item h3 {
+      font-size: .95rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: .2rem;
+    }
+    .mistake-item p { font-size: .85rem; color: var(--muted); margin: 0; }
+
+    /* ─── Calculator ─────────────────────────────────────── */
+    .calc-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-top: 1.5rem;
+    }
+    .calc-fields {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .field-group { display: flex; flex-direction: column; gap: .4rem; flex: 1; min-width: 130px; }
+    .field-group label { font-size: .8rem; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+    .field-group input {
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 1rem;
+      padding: .65rem .85rem;
+      width: 100%;
+      transition: border-color .15s;
+    }
+    .field-group input:focus { outline: none; border-color: var(--accent); }
+    .calc-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: .7rem 1.5rem;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .calc-btn:hover { opacity: .85; }
+    #calc-result {
+      margin-top: 1.25rem;
+      display: none;
+    }
+    .result-card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 1.25rem 1.4rem;
+    }
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .5rem 0;
+      font-size: .9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-key { color: var(--muted); }
+    .result-val { font-weight: 600; color: #fff; font-family: var(--mono); }
+    .result-val.ok  { color: var(--green); }
+    .result-val.err { color: var(--red); }
+
+    /* ─── Template / CTA block ───────────────────────────── */
+    .cta-block {
+      background: linear-gradient(135deg, rgba(99,102,241,.15) 0%, rgba(168,85,247,.1) 100%);
+      border: 1px solid rgba(99,102,241,.3);
+      border-radius: 14px;
+      padding: 2.5rem;
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+    .cta-block h3 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: .6rem;
+    }
+    .cta-block p { color: #a3a3a3; margin-bottom: 1.5rem; }
+
+    /* ─── Product section ────────────────────────────────── */
+    .workflow-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 1.75rem 0;
+    }
+    .step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      position: relative;
+    }
+    .step-num {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: .75rem;
+    }
+    .step h3 { font-size: .95rem; font-weight: 600; color: #fff; margin-bottom: .25rem; }
+    .step p   { font-size: .85rem; color: var(--muted); margin: 0; }
+
+    /* ─── FAQ ────────────────────────────────────────────── */
+    .faq-list { margin-top: 1.5rem; }
+    details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: .75rem;
+      overflow: hidden;
+    }
+    summary {
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .95rem;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::after {
+      content: '+';
+      font-size: 1.15rem;
+      color: var(--accent);
+      flex-shrink: 0;
+      transition: transform .2s;
+    }
+    details[open] summary::after { transform: rotate(45deg); }
+    .faq-answer {
+      padding: 0 1.25rem 1rem;
+      font-size: .9rem;
+      color: #a3a3a3;
+      border-top: 1px solid var(--border);
+      padding-top: .85rem;
+    }
+
+    /* ─── Footer ─────────────────────────────────────────── */
+    .page-footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 0;
+      text-align: center;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .page-footer a { color: var(--muted); }
+    .page-footer a:hover { color: var(--text); }
+
+    /* ─── Responsive ─────────────────────────────────────── */
+    @media (max-width: 600px) {
+      section { padding: 2.5rem 0; }
+      .hero   { padding: 3rem 0 2.5rem; }
+      .cta-block { padding: 1.75rem 1.25rem; }
+      .calc-wrap  { padding: 1.25rem; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Top nav ── -->
+  <nav class="topnav" aria-label="Site navigation">
+    <div class="topnav-inner">
+      <a href="/" class="topnav-logo">Screen<span>Frame</span></a>
+      <a href="/" class="topnav-cta">Open App &rarr;</a>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════
+       1. HERO
+  ═══════════════════════════════════════════════════════════ -->
+  <header class="hero">
+    <div class="page-wrap">
+      <div class="hero-eyebrow">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6 3v3.5l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Updated for 2026
+      </div>
+
+      <h1>
+        App Store <span class="gradient">Screenshot Sizes</span><br />
+        — 2026 Guide
+      </h1>
+
+      <p class="hero-sub">
+        A clear reference for iPhone and Android screenshot dimensions,
+        with a size calculator and free templates to help you create
+        App Store screenshots quickly.
+      </p>
+
+      <div class="hero-btns">
+        <a href="#templates" class="btn btn-primary">
+          Download Free Screenshot Template
+        </a>
+        <a href="#calculator" class="btn btn-outline">
+          Size Calculator &darr;
+        </a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-num">3</div>
+          <div class="stat-label">Required iPhone sizes</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">10</div>
+          <div class="stat-label">Max screenshots per device</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">6.9"</div>
+          <div class="stat-label">Largest required display</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">1080×1920</div>
+          <div class="stat-label">Google Play recommended</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-wrap">
+
+      <!-- ═══════════════════════════════════════════════════
+           2. QUICK OVERVIEW
+      ═══════════════════════════════════════════════════════ -->
+      <section id="overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading">Why screenshot sizes matter</h2>
+        <p class="section-lead">
+          Both Apple and Google enforce specific screenshot dimensions for store listings.
+          Submit the wrong size and your build will be rejected; submit low-quality images
+          and your conversion rate will suffer. This guide covers everything in one place.
+        </p>
+
+        <div class="overview-grid">
+          <div class="overview-card">
+            <div class="overview-card-icon">📐</div>
+            <h3>Current size requirements</h3>
+            <p>Exact pixel dimensions for every required iPhone display and Android form factor.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">🖼️</div>
+            <h3>Visual examples</h3>
+            <p>Annotated layouts showing safe zones, text placement, and device frame usage.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">📦</div>
+            <h3>Free templates</h3>
+            <p>Export-ready screenshot templates pre-sized for App Store and Google Play.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">⚡</div>
+            <h3>Faster workflow</h3>
+            <p>ScreenFrame generates all required sizes in one pass — no manual Figma resizing.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           3. IPHONE SCREENSHOT SIZES
+      ═══════════════════════════════════════════════════════ -->
+      <section id="iphone-sizes" aria-labelledby="iphone-heading">
+        <h2 id="iphone-heading">iPhone screenshot sizes for the App Store</h2>
+        <p class="section-lead">
+          Apple requires at least one screenshot for each display class you want to support.
+          You can use a single set of 6.9-inch screenshots to cover all smaller iPhone classes —
+          Apple will auto-scale them in the listing. The table below covers all <strong style="color:#fff">App Store screenshot sizes</strong> for 2026.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">iPhone App Store screenshot dimensions</caption>
+            <thead>
+              <tr>
+                <th scope="col">Display size</th>
+                <th scope="col">Resolution (px)</th>
+                <th scope="col">Scale</th>
+                <th scope="col">Covers smaller?</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>6.9-inch</strong> <span class="badge badge-green" style="vertical-align:middle">Required</span><br /><span style="color:var(--muted);font-size:.8rem">iPhone Air, iPhone 17 Pro Max, 16 Pro Max, 16 Plus, 15 Pro Max, 15 Plus, 14 Pro Max</span></td>
+                <td><span class="badge badge-blue">1260 × 2736</span></td>
+                <td>3×</td>
+                <td><span class="badge badge-green">Yes — all iPhones</span></td>
+                <td style="color:var(--muted);font-size:.85rem">The current primary required slot. Submit only this size to satisfy all iPhone display requirements.</td>
+              </tr>
+              <tr>
+                <td><strong>6.5-inch</strong> <span class="badge badge-amber" style="vertical-align:middle">Required if no 6.9"</span><br /><span style="color:var(--muted);font-size:.8rem">iPhone 14 Plus, 13 Pro Max, 12 Pro Max, 11 Pro Max, 11, XS Max, XR</span></td>
+                <td>
+                  <span class="badge badge-blue">1284 × 2778</span><br />
+                  <span style="color:var(--muted);font-size:.8rem">or</span><br />
+                  <span class="badge badge-blue">1242 × 2688</span>
+                </td>
+                <td>3×</td>
+                <td><span class="badge badge-amber">Partial</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Accepted in place of 6.9" for older device targeting. Apple accepts either pixel size for this slot.</td>
+              </tr>
+              <tr>
+                <td><strong>5.5-inch</strong> <span class="badge badge-amber" style="vertical-align:middle">Optional</span><br /><span style="color:var(--muted);font-size:.8rem">iPhone 8 Plus, 7 Plus, 6S Plus, 6 Plus</span></td>
+                <td><span class="badge badge-blue">1242 × 2208</span></td>
+                <td>3×</td>
+                <td>—</td>
+                <td style="color:var(--muted);font-size:.85rem">Optional — scales from 6.5" if not provided. Only needed if you explicitly support Plus-sized iPhones.</td>
+              </tr>
+              <tr>
+                <td><strong>6.9-inch iPad Pro</strong><br /><span style="color:var(--muted);font-size:.8rem">iPad Pro M4 13"</span></td>
+                <td><span class="badge badge-blue">2064 × 2752</span></td>
+                <td>2×</td>
+                <td><span class="badge badge-green">Yes</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Required for universal apps listing on iPad.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tip-box" role="note">
+          <strong>Pro tip:</strong> Submit only 6.9-inch (1260 × 2736) screenshots and Apple will
+          accept them for all smaller iPhone display classes. This is the fastest path to compliance.
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           4. GOOGLE PLAY REQUIREMENTS
+      ═══════════════════════════════════════════════════════ -->
+      <section id="google-play" aria-labelledby="gp-heading">
+        <h2 id="gp-heading">Google Play screenshot dimensions</h2>
+        <p class="section-lead">
+          Google Play is more flexible than Apple — it accepts a range of sizes rather than
+          fixed dimensions. The core rule: neither dimension may be below 320 px or above 3840 px,
+          and the longest side may not be more than twice the shortest side. Screenshots must
+          accurately represent the app's real interface.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Google Play screenshot requirements</caption>
+            <thead>
+              <tr>
+                <th scope="col">Requirement</th>
+                <th scope="col">Value</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Minimum width</td>
+                <td><span class="badge badge-amber">320 px</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Neither dimension may be below 320 px.</td>
+              </tr>
+              <tr>
+                <td>Maximum width</td>
+                <td><span class="badge badge-amber">3840 px</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Neither dimension may exceed 3840 px.</td>
+              </tr>
+              <tr>
+                <td>Aspect ratio rule</td>
+                <td><span class="badge badge-blue">max side ≤ 2× min side</span></td>
+                <td style="color:var(--muted);font-size:.85rem">The longest dimension cannot be more than twice the shortest dimension. 16:9 and 9:16 both satisfy this rule comfortably.</td>
+              </tr>
+              <tr>
+                <td><strong>Recommended min (phone)</strong></td>
+                <td><span class="badge badge-green">1080 × 1920</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Minimum resolution to be eligible for Play Store homepage recommendations. Portrait 9:16 or landscape 16:9 (min 1920 × 1080). Apps need at least 4 qualifying screenshots.</td>
+              </tr>
+              <tr>
+                <td>Tablets &amp; Chromebooks</td>
+                <td><span class="badge badge-blue">1080 – 7680 px</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Upload between 1080 and 7680 px. Use 16:9 for landscape or 9:16 for portrait. Minimum 4 screenshots required for large-screen listings.</td>
+              </tr>
+              <tr>
+                <td>File format</td>
+                <td><span class="badge badge-blue">JPEG / 24-bit PNG</span></td>
+                <td style="color:var(--muted);font-size:.85rem">No alpha (transparency) in either format. PNG must be 24-bit.</td>
+              </tr>
+              <tr>
+                <td>Count</td>
+                <td><span class="badge badge-amber">2 – 8</span></td>
+                <td style="color:var(--muted);font-size:.85rem">Google requires a minimum of 2 screenshots per device form factor.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="tip-box" role="note">
+          <strong>Recommendation eligibility:</strong> To appear in Play Store homepage recommendations,
+          apps need at least <strong>4 screenshots</strong> with a minimum of 1080 px on the short side
+          (portrait: min 1080 × 1920; landscape: min 1920 × 1080). This is separate from the hard upload
+          requirements above.
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           5. COMMON MISTAKES
+      ═══════════════════════════════════════════════════════ -->
+      <section id="mistakes" aria-labelledby="mistakes-heading">
+        <h2 id="mistakes-heading">Common mistakes that hurt App Store conversion</h2>
+        <p class="section-lead">
+          Getting the dimensions right is only half the battle.
+          These are the most frequent errors that tank installs.
+        </p>
+
+        <div class="mistakes-list">
+          <div class="mistake-item">
+            <div class="mistake-icon">❌</div>
+            <div>
+              <h3>Incorrect screenshot resolution</h3>
+              <p>Submitting a 1242 × 2208 screenshot when Apple requires 1260 × 2736 for the current 6.9-inch slot causes an immediate build rejection. Always match the exact pixel dimensions for the slot you are targeting.</p>
+            </div>
+          </div>
+          <div class="mistake-item">
+            <div class="mistake-icon">🔍</div>
+            <div>
+              <h3>UI elements too small to read</h3>
+              <p>Screenshots are displayed at thumbnail size in search results. If your interface text is smaller than ~24 pt at actual screen size, it will be unreadable in the listing — reducing tap-through rates significantly.</p>
+            </div>
+          </div>
+          <div class="mistake-item">
+            <div class="mistake-icon">📱</div>
+            <div>
+              <h3>Missing device frames</h3>
+              <p>Raw screenshots look unpolished next to competitors that use device frames. Adding an iPhone or Android frame provides visual context and improves perceived quality.</p>
+            </div>
+          </div>
+          <div class="mistake-item">
+            <div class="mistake-icon">📝</div>
+            <div>
+              <h3>Too much text on screenshots</h3>
+              <p>Feature headlines should be concise — five words maximum. Paragraphs of text on screenshots perform poorly in A/B tests. Lead with a visual, support it with a short benefit statement.</p>
+            </div>
+          </div>
+          <div class="mistake-item">
+            <div class="mistake-icon">🎨</div>
+            <div>
+              <h3>Inconsistent layout across the set</h3>
+              <p>Each screenshot should feel like it belongs to the same visual system — consistent background, font, and color. Inconsistent layouts signal an unpolished product before the user even reads a word.</p>
+            </div>
+          </div>
+          <div class="mistake-item">
+            <div class="mistake-icon">⏱️</div>
+            <div>
+              <h3>Not updating screenshots after major UI changes</h3>
+              <p>Outdated screenshots that don't match the current app generate negative reviews and support tickets. Schedule a screenshot refresh alongside every major UI release.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           6. CALCULATOR
+      ═══════════════════════════════════════════════════════ -->
+      <section id="calculator" aria-labelledby="calc-heading">
+        <h2 id="calc-heading">Screenshot size calculator</h2>
+        <p class="section-lead">
+          Enter your screenshot dimensions below to instantly check App Store &amp;
+          Google Play compliance and see which device category it matches.
+        </p>
+
+        <div class="calc-wrap">
+          <div class="calc-fields">
+            <div class="field-group">
+              <label for="calc-w">Width (px)</label>
+              <input type="number" id="calc-w" min="1" placeholder="e.g. 1260" />
+            </div>
+            <div class="field-group">
+              <label for="calc-h">Height (px)</label>
+              <input type="number" id="calc-h" min="1" placeholder="e.g. 2796" />
+            </div>
+            <div style="display:flex;align-items:flex-end">
+              <button class="calc-btn" id="calc-run" type="button">Check size</button>
+            </div>
+          </div>
+
+          <div id="calc-result" role="region" aria-live="polite">
+            <div class="result-card">
+              <div class="result-row">
+                <span class="result-key">Dimensions</span>
+                <span class="result-val" id="res-dims">—</span>
+              </div>
+              <div class="result-row">
+                <span class="result-key">Aspect ratio</span>
+                <span class="result-val" id="res-ratio">—</span>
+              </div>
+              <div class="result-row">
+                <span class="result-key">App Store status</span>
+                <span class="result-val" id="res-appstore">—</span>
+              </div>
+              <div class="result-row">
+                <span class="result-key">Matched device class</span>
+                <span class="result-val" id="res-device">—</span>
+              </div>
+              <div class="result-row">
+                <span class="result-key">Google Play status</span>
+                <span class="result-val" id="res-gplay">—</span>
+              </div>
+              <div class="result-row">
+                <span class="result-key">Suggested export size</span>
+                <span class="result-val" id="res-suggest">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           7. FREE TEMPLATE DOWNLOAD
+      ═══════════════════════════════════════════════════════ -->
+      <section id="templates" aria-labelledby="templates-heading">
+        <h2 id="templates-heading">Free screenshot template pack</h2>
+        <p class="section-lead">
+          Setting up screenshot layouts by hand in Figma or Sketch takes 2–4 hours for a
+          first set and at least 30 minutes per update. The free ScreenFrame template pack
+          gives you a ready-to-export starting point.
+        </p>
+
+        <div class="cta-block">
+          <h3>Free App Store Screenshot Template</h3>
+          <p>
+            Includes an iPhone frame, gradient background, headline placeholder, and
+            all three required App Store export dimensions — ready to use in ScreenFrame.
+          </p>
+          <a href="/" class="btn btn-primary" style="display:inline-flex">
+            Download Free Template
+          </a>
+        </div>
+
+        <div class="overview-grid" style="margin-top:1.5rem">
+          <div class="overview-card">
+            <div class="overview-card-icon">📱</div>
+            <h3>iPhone frame</h3>
+            <p>Pre-cropped device frame for all three App Store display sizes.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">🌈</div>
+            <h3>Background layouts</h3>
+            <p>Solid, gradient, and blur backgrounds — all export-ready.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">✏️</div>
+            <h3>Headline placeholder</h3>
+            <p>Editable text layer with recommended font size and safe-zone guides.</p>
+          </div>
+          <div class="overview-card">
+            <div class="overview-card-icon">📤</div>
+            <h3>Export-ready dimensions</h3>
+            <p>Pre-configured artboards at 1260 × 2736, 1284 × 2778, and 1242 × 2208.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           8. SCREENFRAME PRODUCT INTRO
+      ═══════════════════════════════════════════════════════ -->
+      <section id="product" aria-labelledby="product-heading">
+        <h2 id="product-heading">Create App Store screenshots faster with ScreenFrame</h2>
+        <p class="section-lead">
+          ScreenFrame is a browser-based tool for indie developers that generates
+          App Store and Google Play screenshots in minutes — no design software required.
+        </p>
+
+        <div class="workflow-steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <h3>Insert your screenshot</h3>
+            <p>Drag in a raw simulator screenshot. ScreenFrame auto-detects the device and crops it correctly.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <h3>Add a device frame &amp; headline</h3>
+            <p>Pick an iPhone or Android frame, choose a background, and type your benefit statement.</p>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <h3>Export App Store–ready images</h3>
+            <p>Download all required sizes in one click — correctly named, correctly sized, ready to upload.</p>
+          </div>
+        </div>
+
+        <div class="cta-block">
+          <h3>Stop wrestling with Figma artboards</h3>
+          <p>
+            ScreenFrame handles every screenshot size, frame, and export format so you can
+            spend your time shipping features instead of resizing PNGs.
+          </p>
+          <a href="/" class="btn btn-primary" style="display:inline-flex">
+            Get ScreenFrame Templates &rarr;
+          </a>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           9. FAQ — with JSON-LD schema
+      ═══════════════════════════════════════════════════════ -->
+      <section id="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">Frequently asked questions</h2>
+        <p class="section-lead">
+          Quick answers to what developers search most before uploading to the App Store.
+        </p>
+
+        <div class="faq-list">
+          <details>
+            <summary>What size screenshots does the App Store require?</summary>
+            <div class="faq-answer">
+              Apple requires screenshots for each display class you support. The current primary required size is
+              <strong>1260 × 2736 px</strong> (6.9-inch), which Apple accepts in place of all smaller iPhone display classes.
+              If you also target iPad, you need at least one iPad Pro screenshot (2064 × 2752 px or 2048 × 2732 px for the 13-inch display).
+            </div>
+          </details>
+
+          <details>
+            <summary>Do App Store screenshots need device frames?</summary>
+            <div class="faq-answer">
+              Apple does not require device frames — they are optional. However, screenshots with device frames
+              consistently outperform raw UI screenshots in A/B tests because they provide context and look more polished.
+              ScreenFrame adds frames automatically.
+            </div>
+          </details>
+
+          <details>
+            <summary>What screenshot size works for all iPhones?</summary>
+            <div class="faq-answer">
+              <strong>1260 × 2736 px</strong> (the 6.9-inch display resolution) is the current universal iPhone screenshot size.
+              Apple permits using this resolution for all smaller iPhone display classes — 6.5-inch, 5.5-inch, and below —
+              meaning you can submit a single set of screenshots to cover every iPhone in the App Store.
+            </div>
+          </details>
+
+          <details>
+            <summary>What resolution should Google Play screenshots be?</summary>
+            <div class="faq-answer">
+              The hard limits are: minimum 320 px and maximum 3840 px on any side, and the longest side
+              cannot be more than twice the shortest side. For phone screenshots, the minimum to qualify
+              for Play Store homepage recommendations is <strong>1080 × 1920 px</strong> (9:16 portrait) or
+              <strong>1920 × 1080 px</strong> (16:9 landscape) — Google requires at least 4 screenshots at
+              this resolution for apps. For tablets and Chromebooks, upload between 1080 and 7680 px
+              using 16:9 or 9:16 aspect ratios.
+            </div>
+          </details>
+
+          <details>
+            <summary>How many screenshots can I upload to the App Store?</summary>
+            <div class="faq-answer">
+              Apple allows up to <strong>10 screenshots</strong> per device display class.
+              The minimum is 1. Most high-converting listings use 4–6 screenshots that tell
+              a clear story about the app's value from install intent to key features.
+            </div>
+          </details>
+
+          <details>
+            <summary>Can I use the same screenshots for the App Store and Google Play?</summary>
+            <div class="faq-answer">
+              Not directly — the two stores use different aspect ratios by default. Apple's current required portrait size
+              (1260 × 2736) is approximately 9:19.5, while Google Play's recommended size (1080 × 1920) is exactly 9:16.
+              You'll need to re-crop or create separate exports for each store.
+              ScreenFrame exports both sets simultaneously.
+            </div>
+          </details>
+        </div>
+      </section>
+
+    </div><!-- /page-wrap -->
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer class="page-footer">
+    <div class="page-wrap">
+      <p>
+        &copy; 2026 ScreenFrame &nbsp;·&nbsp;
+        <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp;
+        <a href="/terms">Terms of Service</a> &nbsp;·&nbsp;
+        <a href="/">Open App</a>
+      </p>
+      <p style="margin-top:.5rem;font-size:.8rem">
+        App Store and iPhone are trademarks of Apple Inc. Google Play is a trademark of Google LLC.
+        ScreenFrame is not affiliated with Apple or Google.
+      </p>
+    </div>
+  </footer>
+
+  <!-- ══════════════════════════════════════════════
+       JSON-LD: FAQ Schema
+  ══════════════════════════════════════════════════ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What size screenshots does the App Store require?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Apple requires screenshots for each display class you support. The current primary required size is 1260 × 2736 px (6.9-inch), which Apple accepts in place of all smaller iPhone display classes. If you also target iPad, you need at least one iPad Pro screenshot (2064 × 2752 px or 2048 × 2732 px for the 13-inch display)."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do App Store screenshots need device frames?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Apple does not require device frames. However, screenshots with device frames consistently outperform raw UI screenshots in A/B tests because they provide context and look more polished."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What screenshot size works for all iPhones?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "1260 × 2736 px (the 6.9-inch display resolution) is the current universal iPhone screenshot size. Apple permits using this resolution for all smaller iPhone display classes, meaning you can submit a single set of screenshots to cover every iPhone in the App Store."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What resolution should Google Play screenshots be?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The hard limits are: minimum 320 px and maximum 3840 px on any side, and the longest side cannot be more than twice the shortest side. For phone screenshots, the minimum to qualify for Play Store homepage recommendations is 1080 × 1920 px (portrait) or 1920 × 1080 px (landscape). Google requires at least 4 screenshots at this resolution for apps. For tablets and Chromebooks, upload between 1080 and 7680 px using 16:9 or 9:16 aspect ratios."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How many screenshots can I upload to the App Store?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Apple allows up to 10 screenshots per device display class. The minimum is 1."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I use the same screenshots for the App Store and Google Play?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Not directly. Apple's current required portrait size (1260 × 2736) is approximately 9:19.5, while Google Play's recommended size (1080 × 1920) is exactly 9:16. You need to re-crop or create separate exports for each store."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       BreadcrumbList Schema
+  ══════════════════════════════════════════════════ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "ScreenFrame",
+        "item": "https://screenframe.app"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "App Store Screenshot Sizes",
+        "item": "https://screenframe.app/app-store-screenshot-sizes"
+      }
+    ]
+  }
+  </script>
+
+  <!-- ══════════════════════════════════════════════
+       Screenshot Size Calculator Logic
+  ══════════════════════════════════════════════════ -->
+  <script>
+  (function () {
+    'use strict';
+
+    // Known App Store screenshot slots (portrait orientation)
+    var APP_STORE_SIZES = [
+      { w: 1260, h: 2736, label: '6.9-inch iPhone (required — iPhone Air, 17 Pro Max, 16 Pro Max, 16 Plus…)', universal: true },
+      { w: 1284, h: 2778, label: '6.5-inch iPhone variant A (iPhone 14 Plus, 13 Pro Max, 12 Pro Max…)', universal: false },
+      { w: 1242, h: 2688, label: '6.5-inch iPhone variant B (iPhone 11 Pro Max, XS Max, XR…)', universal: false },
+      { w: 1242, h: 2208, label: '5.5-inch iPhone (iPhone 8 Plus / 7 Plus)', universal: false },
+      { w: 2064, h: 2752, label: '13-inch iPad Pro M4', universal: false },
+      { w: 2048, h: 2732, label: '12.9-inch iPad Pro (3rd–5th gen)', universal: false },
+      { w: 1668, h: 2388, label: '11-inch iPad Pro / iPad Air 13"', universal: false },
+      { w: 1640, h: 2360, label: '10.9-inch iPad Air', universal: false },
+    ];
+
+    // Normalize to portrait (w <= h)
+    function portrait(w, h) {
+      return w <= h ? { w: w, h: h } : { w: h, h: w };
+    }
+
+    function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+    function ratioStr(w, h) {
+      var d = gcd(w, h);
+      return (w / d) + ':' + (h / d);
+    }
+
+    function checkAppStore(w, h) {
+      var p = portrait(w, h);
+      for (var i = 0; i < APP_STORE_SIZES.length; i++) {
+        var s = APP_STORE_SIZES[i];
+        if (s.w === p.w && s.h === p.h) {
+          return { ok: true, device: s.label, universal: s.universal };
+        }
+      }
+      return { ok: false, device: null, universal: false };
+    }
+
+    function checkGooglePlay(w, h) {
+      var minSide = Math.min(w, h);
+      var maxSide = Math.max(w, h);
+      if (minSide < 320 || maxSide > 3840) return false;
+      // Google Play rule: longest side must not be more than 2× the shortest side
+      var ratio = maxSide / minSide;
+      return ratio <= 2;
+    }
+
+    function suggestExport(w, h) {
+      // Find closest App Store slot
+      var p = portrait(w, h);
+      var best = null;
+      var bestDist = Infinity;
+      for (var i = 0; i < APP_STORE_SIZES.length; i++) {
+        var s = APP_STORE_SIZES[i];
+        var dist = Math.abs(s.w - p.w) + Math.abs(s.h - p.h);
+        if (dist < bestDist) { bestDist = dist; best = s; }
+      }
+      if (bestDist === 0) return 'Already correct for ' + best.label;
+      return best.w + ' × ' + best.h + ' (' + best.label + ')';
+    }
+
+    document.getElementById('calc-run').addEventListener('click', function () {
+      var wVal = parseInt(document.getElementById('calc-w').value, 10);
+      var hVal = parseInt(document.getElementById('calc-h').value, 10);
+
+      if (!wVal || !hVal || wVal < 1 || hVal < 1) {
+        alert('Please enter valid width and height values.');
+        return;
+      }
+
+      var asResult  = checkAppStore(wVal, hVal);
+      var gpValid   = checkGooglePlay(wVal, hVal);
+      var suggest   = suggestExport(wVal, hVal);
+
+      document.getElementById('res-dims').textContent    = wVal + ' × ' + hVal + ' px';
+      document.getElementById('res-ratio').textContent   = ratioStr(wVal, hVal);
+      document.getElementById('res-appstore').textContent = asResult.ok ? '✓ Valid' : '✗ Not a standard App Store size';
+      document.getElementById('res-appstore').className  = 'result-val ' + (asResult.ok ? 'ok' : 'err');
+      document.getElementById('res-device').textContent  = asResult.device
+        ? asResult.device + (asResult.universal ? ' (covers all iPhones)' : '')
+        : 'No match — see suggestion below';
+      document.getElementById('res-gplay').textContent   = gpValid ? '✓ Valid' : '✗ Outside allowed range';
+      document.getElementById('res-gplay').className     = 'result-val ' + (gpValid ? 'ok' : 'err');
+      document.getElementById('res-suggest').textContent = suggest;
+
+      var result = document.getElementById('calc-result');
+      result.style.display = 'block';
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // Also allow Enter key in inputs
+    ['calc-w', 'calc-h'].forEach(function (id) {
+      document.getElementById(id).addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('calc-run').click();
+      });
+    });
+  })();
+  </script>
+
+</body>
+</html>

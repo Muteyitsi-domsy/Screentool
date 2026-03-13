@@ -9,16 +9,18 @@ interface CropEditorProps {
   onFitChange: (mode: FitMode) => void;
   onCropChange: (crop: CropArea) => void;
   onClose: () => void;
+  onDiscardMaster: () => void;
   showConfirm: (title: string, message: string, onConfirm: () => void, confirmLabel?: string) => void;
 }
 
-const CropEditor: React.FC<CropEditorProps> = ({ 
-  image, 
-  cropArea, 
-  fitMode, 
-  onFitChange, 
-  onCropChange, 
+const CropEditor: React.FC<CropEditorProps> = ({
+  image,
+  cropArea,
+  fitMode,
+  onFitChange,
+  onCropChange,
   onClose,
+  onDiscardMaster,
   showConfirm
 }) => {
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -183,8 +185,19 @@ const CropEditor: React.FC<CropEditorProps> = ({
         </div>
 
         <div className="flex gap-2 w-full lg:w-auto">
-          <button 
-            onClick={handleExit} 
+          <button
+            onClick={() => showConfirm(
+              "Discard Master",
+              "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
+              onDiscardMaster,
+              "Discard"
+            )}
+            className="flex-1 lg:flex-none px-5 py-2.5 text-[10px] font-black rounded-2xl border border-red-500/20 bg-red-600/5 text-red-500/60 hover:bg-red-600/15 hover:text-red-400 hover:border-red-500/40 transition-all"
+          >
+            DISCARD
+          </button>
+          <button
+            onClick={handleExit}
             className="flex-1 lg:flex-none px-5 py-2.5 text-[10px] font-black text-zinc-400 hover:text-white transition-all bg-zinc-900 border border-zinc-800 rounded-2xl"
           >
             EXIT

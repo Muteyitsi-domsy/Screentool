@@ -1077,6 +1077,7 @@ const App: React.FC = () => {
                     onFitChange={(mode) => setState(prev => ({ ...prev, fitMode: mode }))}
                     onCropChange={(cropArea) => setState(prev => ({ ...prev, cropArea }))}
                     onClose={() => setIsCropMode(false)}
+                    onDiscardMaster={() => { setState(prev => ({ ...prev, image: null })); setIsRevision(false); setIsCropMode(false); }}
                     showConfirm={showConfirm}
                   />
                 </div>

@@ -836,6 +836,19 @@ const App: React.FC = () => {
                   <svg className="w-5 h-5 mb-2 text-blue-500 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">Auto Shine</span>
                 </button>
+                <button
+                  disabled={!state.image}
+                  onClick={() => showConfirm(
+                    "Discard Master",
+                    "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
+                    () => { setState(prev => ({ ...prev, image: null })); setIsRevision(false); },
+                    "Discard"
+                  )}
+                  className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-2xl border border-red-500/20 bg-red-600/5 text-red-500/60 hover:bg-red-600/15 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-20"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest leading-none">Discard Master</span>
+                </button>
               </div>
               <button
                 disabled={!state.image || isAddingToTray}
@@ -1092,7 +1105,7 @@ const App: React.FC = () => {
                           "Discard"
                         );
                       }}
-                      className="absolute -top-6 -right-6 w-12 h-12 bg-zinc-900 hover:bg-red-600 rounded-full flex items-center justify-center text-zinc-600 hover:text-white border border-zinc-800 shadow-2xl transition-all group active:scale-90"
+                      className="absolute top-2 right-2 w-9 h-9 bg-zinc-900/80 hover:bg-red-600 rounded-full flex items-center justify-center text-zinc-600 hover:text-white border border-zinc-800 shadow-xl transition-all active:scale-90 backdrop-blur-sm"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>

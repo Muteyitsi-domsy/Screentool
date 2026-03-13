@@ -620,7 +620,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0a0a0a]">
+    <div className="h-screen flex flex-col md:flex-row bg-[#0a0a0a] overflow-hidden">
       {/* AuthModal — rendered outside the main modal to avoid z-index conflicts */}
       {showAuthModal && (
         <AuthModal
@@ -1037,10 +1037,11 @@ const App: React.FC = () => {
           <>
             {!state.image && (
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group transition-all"
+                className="absolute inset-0 z-10 flex items-center justify-center group transition-all"
               >
-                <div className={`bg-zinc-900/50 border-2 border-dashed rounded-[4rem] p-16 text-center max-w-sm w-full mx-4 backdrop-blur-3xl transition-all ${isDraggingOver ? 'border-blue-500 bg-blue-500/10 scale-[1.05]' : 'border-zinc-800 hover:border-zinc-700'} shadow-[0_0_100px_rgba(0,0,0,0.5)]`}>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`cursor-pointer bg-zinc-900/50 border-2 border-dashed rounded-[4rem] p-16 text-center max-w-sm w-full mx-4 backdrop-blur-3xl transition-all ${isDraggingOver ? 'border-blue-500 bg-blue-500/10 scale-[1.05]' : 'border-zinc-800 hover:border-zinc-700'} shadow-[0_0_100px_rgba(0,0,0,0.5)]`}>
                   <div className="w-20 h-20 rounded-3xl bg-zinc-800/50 flex items-center justify-center mx-auto mb-8 text-zinc-600 group-hover:text-blue-500 transition-all">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                   </div>

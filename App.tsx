@@ -100,6 +100,9 @@ const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const settingsScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
 
   // Initialise Paddle once on mount
   useEffect(() => {
@@ -138,6 +141,19 @@ const App: React.FC = () => {
   useEffect(() => {
     setState(prev => ({ ...prev, frameColor: '#1a1a1a' }));
   }, [state.selectedDevice]);
+
+  const checkSettingsScroll = () => {
+    const el = settingsScrollRef.current;
+    if (!el) return;
+    setCanScrollUp(el.scrollTop > 8);
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 8);
+  };
+
+  useEffect(() => {
+    // seed scroll indicators once the settings panel mounts
+    const id = requestAnimationFrame(checkSettingsScroll);
+    return () => cancelAnimationFrame(id);
+  }, [state.activeView]);
 
   const showAlert = (title: string, message: string) => {
     setModal({
@@ -705,7 +721,9 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/20 p-6 flex flex-col gap-6 overflow-y-auto shrink-0 scrollbar-hide">
+      <aside className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/20 flex flex-col shrink-0">
+        {/* ── Fixed top: logo + nav ── */}
+        <div className="px-6 pt-6 pb-4 flex flex-col gap-6 shrink-0 border-b border-zinc-800/60">
         <header>
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
@@ -765,6 +783,25 @@ const App: React.FC = () => {
             PRICING & FAQ
           </button>
         </nav>
+        </div>{/* end fixed top */}
+
+        {/* ── Scrollable settings zone ── */}
+        <div className="relative flex-1 min-h-0">
+          {canScrollUp && (
+            <button
+              onClick={() => settingsScrollRef.current?.scrollBy({ top: -140, behavior: 'smooth' })}
+              className="absolute top-0 left-0 right-0 z-10 flex justify-center pt-1.5 pb-3 bg-gradient-to-b from-zinc-900 to-transparent pointer-events-auto"
+              aria-label="Scroll up"
+            >
+              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 15l7-7 7 7"/></svg>
+            </button>
+          )}
+
+          <div
+            ref={settingsScrollRef}
+            onScroll={checkSettingsScroll}
+            className="h-full overflow-y-auto px-6 py-5 flex flex-col gap-6 scrollbar-hide"
+          >
 
         {state.activeView === AppView.EDITOR && (
           <>
@@ -848,6 +885,24 @@ const App: React.FC = () => {
                     ))}
                   </optgroup>
                 </select>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Output Mode</label>
+                <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                  <button
+                    onClick={() => setState(prev => ({ ...prev, exportMode: ExportMode.RECTANGLE }))}
+                    className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.exportMode === ExportMode.RECTANGLE ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    RECT
+                  </button>
+                  <button
+                    onClick={() => setState(prev => ({ ...prev, exportMode: ExportMode.FRAME }))}
+                    className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${state.exportMode === ExportMode.FRAME ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    FRAME
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -947,7 +1002,21 @@ const App: React.FC = () => {
            </div>
         )}
 
-        <footer className="mt-auto pt-4 border-t border-zinc-800">
+          </div>{/* end scrollable content */}
+
+          {canScrollDown && (
+            <button
+              onClick={() => settingsScrollRef.current?.scrollBy({ top: 140, behavior: 'smooth' })}
+              className="absolute bottom-0 left-0 right-0 z-10 flex justify-center pb-1.5 pt-3 bg-gradient-to-t from-zinc-900 to-transparent pointer-events-auto"
+              aria-label="Scroll down"
+            >
+              <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+          )}
+        </div>{/* end scrollable zone */}
+
+        {/* ── Fixed footer ── */}
+        <footer className="px-6 py-4 border-t border-zinc-800 shrink-0">
            <p className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.4em] leading-relaxed text-center">
               Batch Process Engine v3.1 • ScreenFrame
            </p>

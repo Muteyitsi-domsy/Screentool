@@ -123,9 +123,9 @@ export const processImage = async (
       let targetW = spec.width;
       let targetH = spec.height;
 
-      // Apple-specific fit padding (Breathing Room)
-      if (isApple && fitMode === FitMode.FIT) {
-        const appleBreathingRoom = spec.width * 0.04; 
+      // Apple-specific fit padding (Breathing Room) — FRAME mode only
+      if (isApple && fitMode === FitMode.FIT && exportMode === ExportMode.FRAME) {
+        const appleBreathingRoom = spec.width * 0.04;
         targetX += appleBreathingRoom;
         targetY += appleBreathingRoom;
         targetW -= appleBreathingRoom * 2;
@@ -225,8 +225,8 @@ export const processImage = async (
         }
       }
 
-      // Apply iPad presentation scale adjustment (0.92) for aesthetic "breathing space"
-      if (spec.id === DeviceType.IPAD) {
+      // Apply iPad presentation scale adjustment (0.92) — FRAME mode only
+      if (spec.id === DeviceType.IPAD && exportMode === ExportMode.FRAME) {
         drawW *= 0.92;
         drawH *= 0.92;
       }

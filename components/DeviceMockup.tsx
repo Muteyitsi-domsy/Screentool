@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { DeviceType, ExportMode, FitMode, CropArea, ImageAdjustments, Platform } from '../types';
 import { DEVICE_SPECS, FRAME_COLORS } from '../constants';
 
@@ -27,8 +27,6 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   const spec = DEVICE_SPECS[deviceType];
   const isLandscape = spec.width > spec.height;
   const isTablet = spec.isTablet;
-  const [showPicker, setShowPicker] = useState(false);
-  
   const maxW = 320;
   const maxH = 500;
   let previewW: number, previewH: number;
@@ -52,6 +50,8 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   };
 
   const isMockup = exportMode === ExportMode.FRAME;
+  const availableColors = FRAME_COLORS[spec.platform];
+  const activeColor = availableColors.find(c => c.hex === frameColor);
 
   const getObjectFit = () => {
     switch (fitMode) {
@@ -63,7 +63,6 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
   };
 
   const filterString = `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
-  const availableColors = FRAME_COLORS[spec.platform];
 
   return (
     <div className="flex flex-col items-center justify-center p-10 bg-zinc-900/30 rounded-[3rem] border border-zinc-800/50 backdrop-blur-xl group/mockup">
@@ -72,25 +71,8 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
           ...containerStyle,
           backgroundColor: isMockup ? frameColor : '#050505'
         }} 
-        className={`transition-all duration-500 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl ${isMockup ? (isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]') : 'rounded shadow-lg'} ${isMockup ? 'ring-[12px] ring-zinc-800/30 ring-inset cursor-pointer hover:ring-blue-500/20' : ''}`}
-        onClick={() => isMockup && setShowPicker(!showPicker)}
+        className={`transition-all duration-500 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl ${isMockup ? (isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]') : 'rounded shadow-lg'} ${isMockup ? 'ring-[12px] ring-zinc-800/30 ring-inset' : ''}`}
       >
-        {isMockup && (
-          <div 
-            className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 transition-all duration-300 z-50 ${showPicker ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 translate-y-4 pointer-events-none'}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-             {availableColors.map(c => (
-               <button
-                 key={c.hex}
-                 onClick={() => { onColorChange?.(c.hex); setShowPicker(false); }}
-                 className={`w-4 h-4 rounded-full border border-white/20 transition-all hover:scale-125 hover:shadow-[0_0_100px_rgba(255,255,255,0.2)] ${frameColor === c.hex ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black' : ''}`}
-                 style={{ backgroundColor: c.hex }}
-                 title={c.name}
-               />
-             ))}
-          </div>
-        )}
 
         {image ? (
           <div 
@@ -120,18 +102,37 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
         )}
       </div>
       
-      <div className="mt-8 flex flex-col items-center gap-1.5">
-         <div className="flex items-center gap-2">
-            <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-80 italic">
-              {spec.name}
-            </span>
-            {isMockup && (
-              <span className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">• {availableColors.find(c => c.hex === frameColor)?.name} Finish</span>
-            )}
-         </div>
-         <span className="text-zinc-600 text-[9px] font-mono tracking-tighter uppercase">
-           {isMockup ? 'Click Frame to Switch Hardware Finish' : 'Canonical Standards Enabled'}
-         </span>
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-[10px] font-black uppercase tracking-widest opacity-80 italic">
+            {spec.name}
+          </span>
+          {isMockup && activeColor && (
+            <span className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">• {activeColor.name} Finish</span>
+          )}
+        </div>
+
+        {isMockup && (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-zinc-600 text-[9px] font-mono tracking-tighter uppercase">Frame Finish</span>
+            <div className="flex items-center gap-2 p-2 bg-zinc-900/80 rounded-full border border-zinc-800">
+              {availableColors.map(c => (
+                <button
+                  key={c.hex}
+                  onClick={() => onColorChange?.(c.hex)}
+                  className={`w-5 h-5 rounded-full border border-white/20 transition-all hover:scale-125 ${frameColor === c.hex ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-black scale-110' : ''}`}
+                  style={{ backgroundColor: c.hex }}
+                  title={c.name}
+                  aria-label={c.name}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isMockup && (
+          <span className="text-zinc-600 text-[9px] font-mono tracking-tighter uppercase">Canonical Standards Enabled</span>
+        )}
       </div>
     </div>
   );

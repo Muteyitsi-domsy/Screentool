@@ -956,6 +956,8 @@ const App: React.FC = () => {
               {' • '}
               <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Privacy</a>
               {' • '}
+              <a href="/app-store-screenshot-sizes" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-400 transition-colors">Screenshot Sizes</a>
+              {' • '}
               <a href="mailto:support@screenframe.app" className="hover:text-zinc-400 transition-colors">Contact</a>
            </p>
         </footer>

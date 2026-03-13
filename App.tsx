@@ -929,6 +929,20 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <button
+              disabled={!state.image}
+              onClick={() => showConfirm(
+                "Discard Master",
+                "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
+                () => { setState(prev => ({ ...prev, image: null })); setIsRevision(false); },
+                "Discard"
+              )}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border border-red-500/20 bg-red-600/5 text-red-500/60 hover:bg-red-600/15 hover:text-red-400 hover:border-red-500/40 transition-all disabled:opacity-20"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">Discard Master</span>
+            </button>
           </>
         )}
 
@@ -1067,34 +1081,18 @@ const App: React.FC = () => {
                   />
                 </div>
               ) : (
-                <>
-                  {state.image && (
-                    <button
-                      onClick={() => showConfirm(
-                        "Discard Master",
-                        "Are you sure you want to discard the current master screenshot and all edits? This will empty the studio.",
-                        () => { setState(prev => ({ ...prev, image: null })); setIsRevision(false); },
-                        "Discard"
-                      )}
-                      className="mb-4 flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/20 bg-red-600/5 text-red-500/60 hover:bg-red-600/15 hover:text-red-400 hover:border-red-500/40 transition-all"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                      <span className="text-[10px] font-black uppercase tracking-widest leading-none">Discard Master</span>
-                    </button>
-                  )}
-                  <div className="relative scale-90 sm:scale-100 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]">
-                    <DeviceMockup
-                      deviceType={state.selectedDevice}
-                      image={state.image}
-                      exportMode={state.exportMode}
-                      fitMode={state.fitMode}
-                      cropArea={state.cropArea}
-                      adjustments={state.adjustments}
-                      frameColor={state.frameColor}
-                      onColorChange={(hex) => setState(prev => ({ ...prev, frameColor: hex }))}
-                    />
-                  </div>
-                </>
+                <div className="relative scale-90 sm:scale-100 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]">
+                  <DeviceMockup
+                    deviceType={state.selectedDevice}
+                    image={state.image}
+                    exportMode={state.exportMode}
+                    fitMode={state.fitMode}
+                    cropArea={state.cropArea}
+                    adjustments={state.adjustments}
+                    frameColor={state.frameColor}
+                    onColorChange={(hex) => setState(prev => ({ ...prev, frameColor: hex }))}
+                  />
+                </div>
               )}
             </div>
           </>

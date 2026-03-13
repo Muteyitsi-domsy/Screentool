@@ -1032,7 +1032,7 @@ const App: React.FC = () => {
         </footer>
       </aside>
 
-      <main className={`flex-1 relative flex flex-col items-center justify-center ${isCropMode ? 'p-0' : 'p-4 md:p-8'} bg-[#0d0d0d] overflow-hidden`}>
+      <main className={`flex-1 relative flex flex-col items-center justify-center ${isCropMode ? 'p-0 overflow-hidden' : 'p-4 md:p-8 overflow-y-auto'} bg-[#0d0d0d]`}>
         {state.activeView === AppView.EDITOR && (
           <>
             {!state.image && (

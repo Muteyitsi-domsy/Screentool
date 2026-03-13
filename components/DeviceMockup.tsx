@@ -71,7 +71,7 @@ const DeviceMockup: React.FC<DeviceMockupProps> = ({
           ...containerStyle,
           backgroundColor: isMockup ? frameColor : '#050505'
         }} 
-        className={`transition-all duration-500 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl ${isMockup ? (isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]') : 'rounded shadow-lg'} ${isMockup ? 'ring-[12px] ring-zinc-800/30 ring-inset' : ''}`}
+        className={`transition-all duration-500 ease-out flex items-center justify-center relative overflow-hidden bg-[#0a0a0a] shadow-2xl ${isMockup ? (isTablet ? 'rounded-[1.4rem]' : 'rounded-[2.4rem]') : 'rounded shadow-lg'}`}
       >
 
         {image ? (

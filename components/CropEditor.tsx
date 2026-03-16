@@ -45,7 +45,7 @@ const CropEditor: React.FC<CropEditorProps> = ({
     initialCrop: cropArea
   });
 
-  const BASE_WIDTH = 380;
+  const BASE_WIDTH = 420;
   const VIEWPORT_ASPECT = 9 / 19.5;
   const BASE_HEIGHT = BASE_WIDTH / VIEWPORT_ASPECT;
 
@@ -62,9 +62,9 @@ const CropEditor: React.FC<CropEditorProps> = ({
 
   const autoFitScale = useMemo(() => {
     if (workspaceSize.w === 0 || workspaceSize.h === 0) return 1;
-    const safety = 140; 
-    const scaleX = (workspaceSize.w - safety) / BASE_WIDTH;
-    const scaleY = (workspaceSize.h - safety) / BASE_HEIGHT;
+    const padding = 32; // 16px breathing room on each side
+    const scaleX = (workspaceSize.w - padding) / BASE_WIDTH;
+    const scaleY = (workspaceSize.h - padding) / BASE_HEIGHT;
     return Math.max(0.2, Math.min(scaleX, scaleY, 2.5));
   }, [workspaceSize, BASE_WIDTH, BASE_HEIGHT]);
 

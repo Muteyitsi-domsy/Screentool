@@ -45,7 +45,7 @@ const CropEditor: React.FC<CropEditorProps> = ({
     initialCrop: cropArea
   });
 
-  const BASE_WIDTH = 420;
+  const BASE_WIDTH = 460;
   const VIEWPORT_ASPECT = 9 / 19.5;
   const BASE_HEIGHT = BASE_WIDTH / VIEWPORT_ASPECT;
 
@@ -227,7 +227,7 @@ const CropEditor: React.FC<CropEditorProps> = ({
             <div className="absolute inset-0 z-0 bg-[#050505] cursor-move" onMouseDown={(e) => handleMouseDown(e, 'move')}>
               <img src={image} alt="Crop Content" className="absolute pointer-events-none max-w-none origin-top-left transition-all" style={{ width: `${100 / (localCrop.width / 100)}%`, height: `${100 / (localCrop.height / 100)}%`, left: `-${localCrop.x * (100 / localCrop.width)}%`, top: `-${localCrop.y * (100 / localCrop.height)}%`, objectFit: fitMode === FitMode.FIT ? 'contain' : fitMode === FitMode.STRETCH ? 'fill' : 'cover' }} />
             </div>
-            <div className="absolute inset-0 pointer-events-none z-10 ring-[24px] ring-black/80 rounded-[3.5rem]"></div>
+            <div className="absolute inset-0 pointer-events-none z-10 ring-[8px] ring-black/80 rounded-[3.5rem]"></div>
             <div className="absolute inset-0 z-30 pointer-events-none">
               <div onMouseDown={(e) => handleMouseDown(e, 'top')} className="absolute top-0 left-12 right-12 h-16 pointer-events-auto cursor-n-resize group flex justify-center pt-3"><div className="w-32 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div></div>
               <div onMouseDown={(e) => handleMouseDown(e, 'bottom')} className="absolute bottom-0 left-12 right-12 h-16 pointer-events-auto cursor-s-resize group flex justify-center pb-3"><div className="w-32 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div></div>

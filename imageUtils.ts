@@ -215,7 +215,7 @@ export const processImage = async (
           drawW = targetH * imgRatio;
         }
       } else if (fitMode === FitMode.AUTOFIT) {
-        if (isAndroid && spec.isTablet && imgRatio < targetRatio) {
+        if (spec.isTablet && imgRatio < targetRatio) {
            drawH = targetH;
            drawW = targetH * imgRatio;
         } else if (imgRatio > targetRatio) {

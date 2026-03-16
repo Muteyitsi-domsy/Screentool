@@ -235,6 +235,30 @@ export const processImage = async (
       const drawX = targetX + (targetW - drawW) / 2;
       const drawY = targetY + (targetH - drawH) / 2;
 
+      // Ambient blurred fill — tablets in AUTOFIT when screenshot is narrower than the canvas.
+      // Scales the screenshot to fill width, blurs it heavily, and darkens it to create an
+      // ambient colour extension. The sharp screenshot is then drawn centered on top.
+      // This produces App Store-ready iPad screenshots from phone assets with no user effort.
+      if (spec.isTablet && fitMode === FitMode.AUTOFIT && imgRatio < targetRatio) {
+        const bgDrawW = targetW;
+        const bgDrawH = targetW / imgRatio;
+        const bgDrawX = targetX;
+        const bgDrawY = targetY + (targetH - bgDrawH) / 2;
+        const blurPx = Math.round(spec.width * 0.025); // ~51px on iPad 2048
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(targetX, targetY, targetW, targetH);
+        ctx.clip();
+        ctx.filter = `blur(${blurPx}px) brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
+        ctx.drawImage(img, sx, sy, sw, sh, bgDrawX, bgDrawY, bgDrawW, bgDrawH);
+        ctx.filter = 'none';
+        // Dark veil so the background reads as ambient colour, not blurred content
+        ctx.fillStyle = 'rgba(0,0,0,0.38)';
+        ctx.fillRect(targetX, targetY, targetW, targetH);
+        ctx.restore();
+      }
+
       ctx.save();
       if (exportMode === ExportMode.FRAME) {
         const isTablet = spec.isTablet;

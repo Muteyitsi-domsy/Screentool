@@ -62,7 +62,7 @@ const CropEditor: React.FC<CropEditorProps> = ({
 
   const autoFitScale = useMemo(() => {
     if (workspaceSize.w === 0 || workspaceSize.h === 0) return 1;
-    const padding = 32; // 16px breathing room on each side
+    const padding = 16; // 8px breathing room on each side
     const scaleX = (workspaceSize.w - padding) / BASE_WIDTH;
     const scaleY = (workspaceSize.h - padding) / BASE_HEIGHT;
     return Math.max(0.2, Math.min(scaleX, scaleY, 2.5));
@@ -172,7 +172,7 @@ const CropEditor: React.FC<CropEditorProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col bg-[#050505] overflow-hidden select-none">
-      <div className="px-6 py-4 md:px-10 md:py-6 border-b border-zinc-800/50 flex flex-col lg:flex-row items-center justify-between gap-6 bg-zinc-900/20 backdrop-blur-3xl shrink-0 z-50">
+      <div className="px-6 py-2 md:px-10 md:py-3 border-b border-zinc-800/50 flex flex-col lg:flex-row items-center justify-between gap-3 bg-zinc-900/20 backdrop-blur-3xl shrink-0 z-50">
         <div className="hidden sm:block">
           <h3 className="text-xl md:text-2xl font-black tracking-tighter text-white uppercase italic leading-none">Canonical Precision</h3>
           <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em] mt-2">WYSIWYG Asset Editor</p>
@@ -218,12 +218,12 @@ const CropEditor: React.FC<CropEditorProps> = ({
         </div>
       </div>
 
-      <div ref={workspaceRef} className="flex-1 relative flex items-center justify-center p-4 overflow-hidden bg-black/40">
+      <div ref={workspaceRef} className="flex-1 relative flex items-center justify-center p-2 overflow-hidden bg-zinc-900/60" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
         <div 
           className="relative z-10 transition-transform duration-500"
           style={{ width: `${BASE_WIDTH}px`, height: `${BASE_HEIGHT}px`, transform: `translate(${pan.x}px, ${pan.y}px) scale(${visualScale})` }}
         >
-          <div ref={viewportRef} className="absolute inset-0 shadow-2xl ring-1 ring-zinc-800 bg-[#0a0a0a] rounded-[3.5rem] flex items-center justify-center overflow-hidden">
+          <div ref={viewportRef} className="absolute inset-0 shadow-2xl ring-2 ring-zinc-500/60 bg-[#0a0a0a] rounded-[3.5rem] flex items-center justify-center overflow-hidden">
             <div className="absolute inset-0 z-0 bg-[#050505] cursor-move" onMouseDown={(e) => handleMouseDown(e, 'move')}>
               <img src={image} alt="Crop Content" className="absolute pointer-events-none max-w-none origin-top-left transition-all" style={{ width: `${100 / (localCrop.width / 100)}%`, height: `${100 / (localCrop.height / 100)}%`, left: `-${localCrop.x * (100 / localCrop.width)}%`, top: `-${localCrop.y * (100 / localCrop.height)}%`, objectFit: fitMode === FitMode.FIT ? 'contain' : fitMode === FitMode.STRETCH ? 'fill' : 'cover' }} />
             </div>
@@ -236,9 +236,6 @@ const CropEditor: React.FC<CropEditorProps> = ({
             </div>
           </div>
         </div>
-      </div>
-      <div className="px-10 py-4 bg-[#080808] border-t border-zinc-900 flex justify-between">
-        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Viewport Precision Mode Active</span>
       </div>
     </div>
   );

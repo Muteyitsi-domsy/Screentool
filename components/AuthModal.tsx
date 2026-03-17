@@ -57,7 +57,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ auth, onSuccess, onClose, betaPro
         </h3>
         <p className="text-zinc-500 text-[10px] font-black leading-relaxed uppercase tracking-wider mb-6">
           {betaPrompt && tab === 'signup'
-            ? 'Free beta launch — create an account to unlock all 8 snapshot slots at no cost. Pro pricing launches soon.'
+            ? 'Free until March 24 — create an account now to unlock all 8 snapshot slots at no cost. Pro pricing launches after.'
             : tab === 'signin'
             ? 'Sign in to access your account.'
             : 'Create a free account to get started.'}

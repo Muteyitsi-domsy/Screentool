@@ -24,6 +24,11 @@ import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db
 import { useAuth } from './hooks/useAuth';
 import { initPaddle, openPaddleCheckout } from './lib/paddle';
 
+// Free beta deadline — after this date the free tier reverts to 1 slot and Pro is required for more.
+const BETA_DEADLINE = new Date('2026-03-24T23:59:59').getTime();
+const isBetaActive = () => Date.now() < BETA_DEADLINE;
+const BETA_DEADLINE_LABEL = 'March 24';
+
 const NEUTRAL_BASELINE: ImageAdjustments = {
   brightness: 100,
   contrast: 100,
@@ -248,9 +253,9 @@ const App: React.FC = () => {
       message: 'Loading a project will replace your current tray. The editor will remain blank.',
       onConfirm: (project: Project) => {
         // HARD DATA GUARD: Prevent loading projects that exceed tier limits
-        // Limit raised to full tray (8) during free beta — revert to 1 when payments go live
         const occupiedCount = project.tray.filter(x => x !== null).length;
-        if (!state.isPro && occupiedCount > 8) {
+        const freeLimit = isBetaActive() ? 8 : 1;
+        if (!state.isPro && occupiedCount > freeLimit) {
           showUpgradeModal();
           return;
         }
@@ -395,16 +400,21 @@ const App: React.FC = () => {
   const addToTray = async () => {
     const currentTrayCount = state.tray.filter(x => x !== null).length;
 
-    // Anonymous user hits 1-slot limit → prompt to sign up for free beta access (all 8 slots)
-    // Revert to showUpgradeModal here when payments go live
+    // Anonymous user hits 1-slot limit → during beta: prompt signup for all 8 free slots
+    // After beta deadline: prompt upgrade (payments)
     if (!auth.user && currentTrayCount >= 1) {
-      setAuthModalBeta(true);
-      setShowAuthModal(true);
+      if (isBetaActive()) {
+        setAuthModalBeta(true);
+        setShowAuthModal(true);
+      } else {
+        showUpgradeModal();
+      }
       return;
     }
 
-    // Signed-in free user hits full tray during beta — revert limit to 1 when payments go live
-    if (!state.isPro && currentTrayCount >= 8) {
+    // Signed-in free user: 8 slots during beta, 1 slot after
+    const freeLimit = isBetaActive() ? 8 : 1;
+    if (!state.isPro && currentTrayCount >= freeLimit) {
       showUpgradeModal();
       return;
     }
@@ -863,7 +873,9 @@ const App: React.FC = () => {
               </button>
               {!state.isPro && (
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center mt-2">
-                  Free Beta • {state.tray.filter(x => x !== null).length}/8 Snapshots Used
+                  {isBetaActive()
+                    ? `Free Until ${BETA_DEADLINE_LABEL} • ${state.tray.filter(x => x !== null).length}/8 Used`
+                    : `Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
                 </p>
               )}
             </section>
@@ -1123,7 +1135,9 @@ const App: React.FC = () => {
                </div>
                {!state.isPro && (
                  <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Free Beta Launch — All 8 Slots Open</span>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
+                    {isBetaActive() ? `Free Beta — Ends ${BETA_DEADLINE_LABEL}` : 'Free Tier — 1 Slot'}
+                  </span>
                  </div>
                )}
             </header>

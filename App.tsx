@@ -98,6 +98,7 @@ const App: React.FC = () => {
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const [isRevision, setIsRevision] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalBeta, setAuthModalBeta] = useState(false);
   const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsScrollRef = useRef<HTMLDivElement>(null);
@@ -247,8 +248,9 @@ const App: React.FC = () => {
       message: 'Loading a project will replace your current tray. The editor will remain blank.',
       onConfirm: (project: Project) => {
         // HARD DATA GUARD: Prevent loading projects that exceed tier limits
+        // Limit raised to full tray (8) during free beta — revert to 1 when payments go live
         const occupiedCount = project.tray.filter(x => x !== null).length;
-        if (!state.isPro && occupiedCount > 1) {
+        if (!state.isPro && occupiedCount > 8) {
           showUpgradeModal();
           return;
         }
@@ -391,11 +393,18 @@ const App: React.FC = () => {
   };
 
   const addToTray = async () => {
-    // HARD DATA GUARD: Final tier-check inside mutation logic.
-    // This must precede all processing or UI state changes.
-    // First slot (index 0) is always free; second slot onwards requires Pro.
     const currentTrayCount = state.tray.filter(x => x !== null).length;
-    if (!state.isPro && currentTrayCount >= 1) {
+
+    // Anonymous user hits 1-slot limit → prompt to sign up for free beta access (all 8 slots)
+    // Revert to showUpgradeModal here when payments go live
+    if (!auth.user && currentTrayCount >= 1) {
+      setAuthModalBeta(true);
+      setShowAuthModal(true);
+      return;
+    }
+
+    // Signed-in free user hits full tray during beta — revert limit to 1 when payments go live
+    if (!state.isPro && currentTrayCount >= 8) {
       showUpgradeModal();
       return;
     }
@@ -582,6 +591,7 @@ const App: React.FC = () => {
   // Called by AuthModal after successful email/password auth
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
+    setAuthModalBeta(false);
     // The useEffect watching auth.user will open Paddle checkout if pendingUpgrade is set
   };
 
@@ -625,9 +635,11 @@ const App: React.FC = () => {
       {showAuthModal && (
         <AuthModal
           auth={auth}
+          betaPrompt={authModalBeta}
           onSuccess={handleAuthSuccess}
           onClose={() => {
             setShowAuthModal(false);
+            setAuthModalBeta(false);
             setPendingUpgrade(null);
             sessionStorage.removeItem('pendingUpgrade');
           }}
@@ -851,7 +863,7 @@ const App: React.FC = () => {
               </button>
               {!state.isPro && (
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center mt-2">
-                  Free: 1 Snapshot Allowed • {state.tray.filter(x => x !== null).length}/1 Active
+                  Free Beta • {state.tray.filter(x => x !== null).length}/8 Snapshots Used
                 </p>
               )}
             </section>
@@ -1111,7 +1123,7 @@ const App: React.FC = () => {
                </div>
                {!state.isPro && (
                  <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Free Mode: 1 Slot Max</span>
+                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Free Beta Launch — All 8 Slots Open</span>
                  </div>
                )}
             </header>

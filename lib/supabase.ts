@@ -4,8 +4,8 @@ export interface Profile {
   id: string;
   is_pro: boolean;
   plan_type: 'free' | 'subscription' | 'lifetime';
-  paddle_customer_id: string | null;
-  paddle_subscription_id: string | null;
+  ls_customer_id: string | null;
+  ls_subscription_id: string | null;
   subscription_status: 'free' | 'active' | 'canceled' | 'paused';
   created_at: string;
 }

@@ -22,12 +22,24 @@ import AuthModal from './components/AuthModal';
 import { processImage, detectBorders } from './imageUtils';
 import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db';
 import { useAuth } from './hooks/useAuth';
-import { initPaddle, openPaddleCheckout } from './lib/paddle';
+import { initLemonSqueezy, openLemonSqueezyCheckout } from './lib/lemonsqueezy';
 
 // Free beta deadline — after this date the free tier reverts to 1 slot and Pro is required for more.
-const BETA_DEADLINE = new Date('2026-03-24T23:59:59').getTime();
+const BETA_DEADLINE = new Date('2026-03-27T23:59:59').getTime();
 const isBetaActive = () => Date.now() < BETA_DEADLINE;
-const BETA_DEADLINE_LABEL = 'March 24';
+const BETA_DEADLINE_LABEL = 'March 27';
+
+// Pro launch date — countdown shown in UI until this passes
+const LAUNCH_DATE = new Date('2026-03-27T09:00:00').getTime();
+const computeCountdown = () => {
+  const diff = Math.max(0, LAUNCH_DATE - Date.now());
+  return {
+    d: Math.floor(diff / 86400000),
+    h: Math.floor((diff % 86400000) / 3600000),
+    m: Math.floor((diff % 3600000) / 60000),
+    s: Math.floor((diff % 60000) / 1000),
+  };
+};
 
 const NEUTRAL_BASELINE: ImageAdjustments = {
   brightness: 100,
@@ -103,6 +115,7 @@ const App: React.FC = () => {
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const [isRevision, setIsRevision] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [countdown, setCountdown] = useState(computeCountdown);
   const [authModalBeta, setAuthModalBeta] = useState(false);
   const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,9 +123,15 @@ const App: React.FC = () => {
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
 
-  // Initialise Paddle once on mount
+  // Initialise Lemon Squeezy overlay once on mount
   useEffect(() => {
-    initPaddle();
+    initLemonSqueezy();
+  }, []);
+
+  // Countdown to Pro launch
+  useEffect(() => {
+    const id = setInterval(() => setCountdown(computeCountdown()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   // Sync server-authoritative isPro into local state
@@ -122,17 +141,17 @@ const App: React.FC = () => {
     }
   }, [auth.isPro, auth.loading]);
 
-  // Handle post-OAuth redirect: open Paddle checkout if upgrade was pending
+  // Handle post-OAuth redirect: open Lemon Squeezy checkout if upgrade was pending
   useEffect(() => {
     if (!auth.loading && auth.user) {
       const pending = sessionStorage.getItem('pendingUpgrade') as 'subscription' | 'lifetime' | null;
       if (pending) {
         sessionStorage.removeItem('pendingUpgrade');
         setPendingUpgrade(null);
-        const priceId = pending === 'lifetime'
-          ? import.meta.env.VITE_PADDLE_PRICE_ID_LIFETIME
-          : import.meta.env.VITE_PADDLE_PRICE_ID_SUBSCRIPTION;
-        openPaddleCheckout(priceId, auth.user.email ?? undefined, auth.user.id);
+        const variantId = pending === 'lifetime'
+          ? import.meta.env.VITE_LS_VARIANT_LIFETIME
+          : import.meta.env.VITE_LS_VARIANT_SUBSCRIPTION;
+        openLemonSqueezyCheckout(variantId, auth.user.email ?? undefined, auth.user.id);
       }
     }
   }, [auth.user?.id, auth.loading]);
@@ -186,17 +205,17 @@ const App: React.FC = () => {
     });
   };
 
-  // Handles auth gating + Paddle checkout for a given plan
+  // Handles auth gating + Lemon Squeezy checkout for a given plan
   const handleUpgradeClick = (planType: 'subscription' | 'lifetime') => {
     if (!auth.user) {
       setPendingUpgrade(planType);
       sessionStorage.setItem('pendingUpgrade', planType);
       setShowAuthModal(true);
     } else {
-      const priceId = planType === 'lifetime'
-        ? import.meta.env.VITE_PADDLE_PRICE_ID_LIFETIME
-        : import.meta.env.VITE_PADDLE_PRICE_ID_SUBSCRIPTION;
-      openPaddleCheckout(priceId, auth.user.email ?? undefined, auth.user.id);
+      const variantId = planType === 'lifetime'
+        ? import.meta.env.VITE_LS_VARIANT_LIFETIME
+        : import.meta.env.VITE_LS_VARIANT_SUBSCRIPTION;
+      openLemonSqueezyCheckout(variantId, auth.user.email ?? undefined, auth.user.id);
     }
   };
 
@@ -602,7 +621,7 @@ const App: React.FC = () => {
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
     setAuthModalBeta(false);
-    // The useEffect watching auth.user will open Paddle checkout if pendingUpgrade is set
+    // The useEffect watching auth.user will open Lemon Squeezy checkout if pendingUpgrade is set
   };
 
   const AdjustmentSlider = ({ label, value, min, max, property }: { label: string, value: number, min: number, max: number, property: keyof ImageAdjustments }) => (
@@ -805,6 +824,21 @@ const App: React.FC = () => {
             PRICING & FAQ
           </button>
         </nav>
+
+        {/* Launch countdown — hidden once launch date passes */}
+        {(countdown.d + countdown.h + countdown.m + countdown.s) > 0 && (
+          <div className="flex items-center justify-between px-1 pt-1">
+            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Pro Launches Friday</span>
+            <div className="flex items-baseline gap-2">
+              {([['d', countdown.d], ['h', countdown.h], ['m', countdown.m], ['s', countdown.s]] as [string, number][]).map(([label, val]) => (
+                <div key={label} className="flex items-baseline gap-0.5">
+                  <span className="text-[11px] font-black text-white tabular-nums">{String(val).padStart(2, '0')}</span>
+                  <span className="text-[7px] font-black text-zinc-600 uppercase">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </div>{/* end fixed top */}
 
         {/* ── Scrollable settings zone ── */}
@@ -874,7 +908,7 @@ const App: React.FC = () => {
               {!state.isPro && (
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center mt-2">
                   {isBetaActive()
-                    ? `Free Until ${BETA_DEADLINE_LABEL} • ${state.tray.filter(x => x !== null).length}/8 Used`
+                    ? `Free • ${state.tray.filter(x => x !== null).length}/8 Used`
                     : `Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
                 </p>
               )}
@@ -1136,7 +1170,7 @@ const App: React.FC = () => {
                {!state.isPro && (
                  <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                    {isBetaActive() ? `Free Beta — Ends ${BETA_DEADLINE_LABEL}` : 'Free Tier — 1 Slot'}
+                    {isBetaActive() ? 'Free Tier' : 'Free Tier — 1 Slot'}
                   </span>
                  </div>
                )}

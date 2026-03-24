@@ -22,10 +22,10 @@ vi.mock('../hooks/useAuth', () => ({
   }),
 }));
 
-// Mock Paddle so no external script is loaded in tests
-vi.mock('../lib/paddle', () => ({
-  initPaddle: vi.fn().mockResolvedValue(undefined),
-  openPaddleCheckout: vi.fn(),
+// Mock Lemon Squeezy so no external script is loaded in tests
+vi.mock('../lib/lemonsqueezy', () => ({
+  initLemonSqueezy: vi.fn(),
+  openLemonSqueezyCheckout: vi.fn(),
 }));
 
 // Silence console.error for expected React warnings in test environment

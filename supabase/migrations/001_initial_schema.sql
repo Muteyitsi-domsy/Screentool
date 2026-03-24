@@ -6,8 +6,8 @@ create table public.profiles (
   id uuid references auth.users on delete cascade primary key,
   is_pro boolean default false not null,
   plan_type text default 'free',                -- 'free' | 'subscription' | 'lifetime'
-  paddle_customer_id text,
-  paddle_subscription_id text,
+  ls_customer_id text,
+  ls_subscription_id text,
   subscription_status text default 'free',      -- 'free' | 'active' | 'canceled' | 'paused'
   created_at timestamptz default now()
 );

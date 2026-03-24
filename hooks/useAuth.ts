@@ -55,7 +55,7 @@ export const useAuth = (): AuthState => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Realtime subscription — instant isPro update when Paddle webhook fires
+  // Realtime subscription — instant isPro update when Lemon Squeezy webhook fires
   useEffect(() => {
     if (!user || !supabase) return;
     const channel = supabase

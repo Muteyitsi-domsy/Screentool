@@ -828,12 +828,12 @@ const App: React.FC = () => {
         {/* Launch countdown — hidden once launch date passes */}
         {(countdown.d + countdown.h + countdown.m + countdown.s) > 0 && (
           <div className="flex items-center justify-between px-1 pt-1">
-            <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Pro Launches Friday</span>
+            <span className="text-[8px] font-black text-red-500 uppercase tracking-widest">Pro Launches Friday</span>
             <div className="flex items-baseline gap-2">
               {([['d', countdown.d], ['h', countdown.h], ['m', countdown.m], ['s', countdown.s]] as [string, number][]).map(([label, val]) => (
                 <div key={label} className="flex items-baseline gap-0.5">
-                  <span className="text-[11px] font-black text-white tabular-nums">{String(val).padStart(2, '0')}</span>
-                  <span className="text-[7px] font-black text-zinc-600 uppercase">{label}</span>
+                  <span className="text-[11px] font-black text-red-400 tabular-nums">{String(val).padStart(2, '0')}</span>
+                  <span className="text-[7px] font-black text-red-800 uppercase">{label}</span>
                 </div>
               ))}
             </div>

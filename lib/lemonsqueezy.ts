@@ -32,6 +32,7 @@ export const openLemonSqueezyCheckout = (
   if (supabaseUserId) params.set('checkout[custom][supabase_user_id]', supabaseUserId);
 
   const url = `https://${storeSlug}.lemonsqueezy.com/checkout/buy/${variantId}?${params}`;
+  console.log('[LS] checkout url:', url);
 
   if (window.LemonSqueezy) {
     window.LemonSqueezy.Url.Open(url);

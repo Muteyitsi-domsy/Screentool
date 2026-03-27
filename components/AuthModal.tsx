@@ -5,13 +5,12 @@ interface AuthModalProps {
   auth: AuthState;
   onSuccess: () => void;
   onClose: () => void;
-  betaPrompt?: boolean; // when true: default to signup tab with beta offer messaging
 }
 
 type AuthTab = 'signin' | 'signup';
 
-const AuthModal: React.FC<AuthModalProps> = ({ auth, onSuccess, onClose, betaPrompt = false }) => {
-  const [tab, setTab] = useState<AuthTab>(betaPrompt ? 'signup' : 'signin');
+const AuthModal: React.FC<AuthModalProps> = ({ auth, onSuccess, onClose }) => {
+  const [tab, setTab] = useState<AuthTab>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,14 +50,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ auth, onSuccess, onClose, betaPro
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
       <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_0_100px_rgba(0,0,0,0.8)]">
         <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-2">
-          {betaPrompt && tab === 'signup'
-            ? 'Unlock All 8 Slots Free'
-            : tab === 'signin' ? 'Sign In' : 'Create Account'}
+          {tab === 'signin' ? 'Sign In' : 'Create Account'}
         </h3>
         <p className="text-zinc-500 text-[10px] font-black leading-relaxed uppercase tracking-wider mb-6">
-          {betaPrompt && tab === 'signup'
-            ? 'Free until March 24 — create an account now to unlock all 8 snapshot slots at no cost. Pro pricing launches after.'
-            : tab === 'signin'
+          {tab === 'signin'
             ? 'Sign in to access your account.'
             : 'Create a free account to get started.'}
         </p>

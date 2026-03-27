@@ -24,11 +24,6 @@ import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db
 import { useAuth } from './hooks/useAuth';
 import { initLemonSqueezy, openLemonSqueezyCheckout } from './lib/lemonsqueezy';
 
-// Free beta deadline — after this date the free tier reverts to 1 slot and Pro is required for more.
-const BETA_DEADLINE = new Date('2026-03-27T23:59:59').getTime();
-const isBetaActive = () => Date.now() < BETA_DEADLINE;
-const BETA_DEADLINE_LABEL = 'March 27';
-
 // Pro launch date — countdown shown in UI until this passes
 const LAUNCH_DATE = new Date('2026-03-27T09:00:00').getTime();
 const computeCountdown = () => {
@@ -116,7 +111,7 @@ const App: React.FC = () => {
   const [isRevision, setIsRevision] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [countdown, setCountdown] = useState(computeCountdown);
-  const [authModalBeta, setAuthModalBeta] = useState(false);
+
   const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsScrollRef = useRef<HTMLDivElement>(null);
@@ -273,8 +268,7 @@ const App: React.FC = () => {
       onConfirm: (project: Project) => {
         // HARD DATA GUARD: Prevent loading projects that exceed tier limits
         const occupiedCount = project.tray.filter(x => x !== null).length;
-        const freeLimit = isBetaActive() ? 8 : 1;
-        if (!state.isPro && occupiedCount > freeLimit) {
+        if (!state.isPro && occupiedCount > 1) {
           showUpgradeModal();
           return;
         }
@@ -419,21 +413,13 @@ const App: React.FC = () => {
   const addToTray = async () => {
     const currentTrayCount = state.tray.filter(x => x !== null).length;
 
-    // Anonymous user hits 1-slot limit → during beta: prompt signup for all 8 free slots
-    // After beta deadline: prompt upgrade (payments)
+    // Anonymous or free user hits 1-slot limit → prompt upgrade
     if (!auth.user && currentTrayCount >= 1) {
-      if (isBetaActive()) {
-        setAuthModalBeta(true);
-        setShowAuthModal(true);
-      } else {
-        showUpgradeModal();
-      }
+      showUpgradeModal();
       return;
     }
 
-    // Signed-in free user: 8 slots during beta, 1 slot after
-    const freeLimit = isBetaActive() ? 8 : 1;
-    if (!state.isPro && currentTrayCount >= freeLimit) {
+    if (!state.isPro && currentTrayCount >= 1) {
       showUpgradeModal();
       return;
     }
@@ -620,7 +606,6 @@ const App: React.FC = () => {
   // Called by AuthModal after successful email/password auth
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
-    setAuthModalBeta(false);
     // The useEffect watching auth.user will open Lemon Squeezy checkout if pendingUpgrade is set
   };
 
@@ -664,11 +649,9 @@ const App: React.FC = () => {
       {showAuthModal && (
         <AuthModal
           auth={auth}
-          betaPrompt={authModalBeta}
           onSuccess={handleAuthSuccess}
           onClose={() => {
             setShowAuthModal(false);
-            setAuthModalBeta(false);
             setPendingUpgrade(null);
             sessionStorage.removeItem('pendingUpgrade');
           }}
@@ -907,9 +890,7 @@ const App: React.FC = () => {
               </button>
               {!state.isPro && (
                 <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center mt-2">
-                  {isBetaActive()
-                    ? `Free • ${state.tray.filter(x => x !== null).length}/8 Used`
-                    : `Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
+                  {`Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
                 </p>
               )}
             </section>
@@ -1170,7 +1151,7 @@ const App: React.FC = () => {
                {!state.isPro && (
                  <div className="px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-full">
                     <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                    {isBetaActive() ? 'Free Tier' : 'Free Tier — 1 Slot'}
+                    {'Free Tier — 1 Slot'}
                   </span>
                  </div>
                )}
@@ -1245,7 +1226,7 @@ const App: React.FC = () => {
                       <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Individual</h4>
                       <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Lifetime license for single app production. One-time payment.</p>
                       <div className="mt-auto pt-6 w-full">
-                         <div className="text-3xl font-black text-white mb-4 italic">$39<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Lifetime</span></div>
+                         <div className="text-3xl font-black text-white mb-4 italic">$119<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Lifetime</span></div>
                          <button onClick={() => handleUpgradeClick('lifetime')} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Individual</button>
                       </div>
                    </div>

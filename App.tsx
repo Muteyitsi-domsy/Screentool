@@ -224,12 +224,12 @@ const App: React.FC = () => {
         setModal(prev => ({ ...prev, isOpen: false }));
         handleUpgradeClick('subscription');
       },
-      confirmLabel: "Subscribe – Individual",
+      confirmLabel: "Monthly – Agencies & Teams",
       onSecondaryConfirm: () => {
         setModal(prev => ({ ...prev, isOpen: false }));
         handleUpgradeClick('lifetime');
       },
-      secondaryConfirmLabel: "Lifetime Access",
+      secondaryConfirmLabel: "Lifetime – Solo Developers",
       secondaryLabel: "Continue with 1 screenshot"
     });
   };

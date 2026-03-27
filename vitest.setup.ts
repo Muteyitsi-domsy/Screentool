@@ -15,6 +15,7 @@ const makeCtx = () => ({
   scale: vi.fn(),
   translate: vi.fn(),
   beginPath: vi.fn(),
+  rect: vi.fn(),
   clip: vi.fn(),
   stroke: vi.fn(),
   arc: vi.fn(),

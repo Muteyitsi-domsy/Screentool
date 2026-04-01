@@ -345,7 +345,23 @@ const App: React.FC = () => {
     });
   };
 
-  const showSaveModal = () => {
+  const showSaveModal = async () => {
+    // Free users cannot save projects
+    if (!state.isPro) {
+      showUpgradeModal();
+      return;
+    }
+
+    // Studio users are capped at 5 saved projects
+    const planType = auth.profile?.plan_type;
+    if (planType === 'subscription') {
+      const existing = await getAllProjectsFromDB();
+      if (existing.length >= 5) {
+        showAlert('Project limit reached', 'Studio plans can save up to 5 projects. Delete an existing project to save a new one, or upgrade to Indie for unlimited saves.');
+        return;
+      }
+    }
+
     setModal({
       isOpen: true,
       type: 'save',
@@ -2374,38 +2390,82 @@ const App: React.FC = () => {
              </header>
 
              <section className="mb-20">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+                   {/* Free */}
+                   <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-[2rem] flex flex-col items-start gap-4">
+                      <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Starter</span>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Free</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Try ScreenFrame — no account or card needed.</p>
+                      <ul className="w-full grid gap-2">
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>1 active project</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>3 screenshots per set</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>iOS + Android export</li>
+                         <li className="text-[11px] text-zinc-600 flex gap-2"><span className="flex-shrink-0">–</span>Watermarked output</li>
+                         <li className="text-[11px] text-zinc-600 flex gap-2"><span className="flex-shrink-0">–</span>No AI copy</li>
+                      </ul>
+                      <div className="mt-auto pt-6 w-full">
+                         <div className="text-3xl font-black text-white mb-4 italic">$0<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Forever</span></div>
+                         <div className="w-full py-3 bg-zinc-900 text-zinc-500 text-[10px] font-black uppercase tracking-widest rounded-xl text-center">Current Plan</div>
+                      </div>
+                   </div>
+
+                   {/* Indie */}
                    <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-[2rem] flex flex-col items-start gap-4">
                       <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Solo Developer</span>
-                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Individual</h4>
-                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Lifetime license for single app production. One-time payment.</p>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Indie</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Lifetime license. One-time payment, no subscription.</p>
+                      <ul className="w-full grid gap-2">
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Unlimited projects</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>All device exports</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>BYOA (Claude or OpenAI)</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>AI copy generation</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>1 user seat</li>
+                      </ul>
                       <div className="mt-auto pt-6 w-full">
                          <div className="text-3xl font-black text-white mb-4 italic">$119<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">Lifetime</span></div>
-                         <button onClick={() => handleUpgradeClick('lifetime')} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Individual</button>
+                         <button onClick={() => handleUpgradeClick('lifetime')} className="w-full py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-200 transition-all">Get Indie</button>
                       </div>
                    </div>
 
+                   {/* Studio */}
                    <div className="p-8 bg-zinc-950 border border-blue-600/30 rounded-[2rem] flex flex-col items-start gap-4 relative overflow-hidden">
                       <div className="absolute top-0 right-0 bg-blue-600 text-white text-[8px] font-black uppercase px-4 py-1 rounded-bl-xl tracking-widest">Most Popular</div>
-                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Agencies</span>
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Teams</span>
                       <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Studio</h4>
-                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Unlimited projects for agencies and multi-app teams. Priority specs.</p>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Up to 5 apps, 3 seats. For growing teams.</p>
+                      <ul className="w-full grid gap-2">
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Up to 5 apps / projects</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>3 seats</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>BYOA included</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Priority export queue</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Team project sharing</li>
+                      </ul>
                       <div className="mt-auto pt-6 w-full">
-                         <div className="text-3xl font-black text-white mb-1 italic">$19<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">/ month</span></div>
-                         <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mb-4">Or $180 / year</div>
-                         <button onClick={() => handleUpgradeClick('subscription')} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Start Subscription</button>
+                         <div className="text-3xl font-black text-white mb-1 italic">$49<span className="text-[10px] text-zinc-600 uppercase tracking-widest not-italic ml-2">/ month</span></div>
+                         <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mb-4">Or $399 / year — save 32%</div>
+                         <button onClick={() => handleUpgradeClick('subscription')} className="w-full py-3 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/20">Start Studio</button>
                       </div>
                    </div>
 
+                   {/* Agency */}
                    <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-[2rem] flex flex-col items-start gap-4">
-                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Enterprise</span>
-                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Large Teams</h4>
-                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Custom invoicing, priority support, and team-wide seat management.</p>
+                      <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Agency</span>
+                      <h4 className="text-2xl font-black text-white uppercase italic tracking-tighter">Agency</h4>
+                      <p className="text-[11px] text-zinc-500 font-medium leading-relaxed">Unlimited apps, 10 seats, white-label and invoicing.</p>
+                      <ul className="w-full grid gap-2">
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Unlimited apps</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>10 seats</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>White-label exports</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Client project folders</li>
+                         <li className="text-[11px] text-zinc-400 flex gap-2"><span className="text-green-500 flex-shrink-0">✓</span>Invoice / PO billing</li>
+                      </ul>
                       <div className="mt-auto pt-6 w-full">
                          <div className="text-3xl font-black text-white mb-4 italic">Custom</div>
-                         <a href="mailto:support@screenframe.app?subject=Enterprise Inquiry" className="block w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-all text-center">Contact us</a>
+                         <a href="mailto:support@screenframe.app?subject=Agency Inquiry" className="block w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-zinc-700 transition-all text-center">Contact us</a>
                       </div>
                    </div>
+
                 </div>
              </section>
 
@@ -2423,15 +2483,15 @@ const App: React.FC = () => {
                       </div>
                       <div>
                          <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">What does upgrading unlock?</h4>
-                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Upgrading to an Individual or Studio license unlocks all 8 tray slots, enabling you to build a complete App Store or Play Store set in one batch. It also enables project saving/loading for future revisions.</p>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Upgrading to Indie or Studio unlocks all 8 tray slots, enabling you to build a complete App Store or Play Store set in one batch. It also enables project saving/loading for future revisions.</p>
                       </div>
                       <div>
                          <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Do I need a subscription?</h4>
-                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. The Individual license is a one-time lifetime payment. Studio and Enterprise plans are available for those who need ongoing team management or higher scale.</p>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">No. The Indie license is a one-time $119 lifetime payment. Studio ($49/month) and Agency (custom) plans are available for teams who need seats, project sharing, or white-label workflows.</p>
                       </div>
                       <div>
-                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Individual vs Studio vs Enterprise?</h4>
-                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Individual is a one-time license for solo devs. Studio is a monthly subscription for agencies managing dozens of apps. Enterprise is for large organizations needing invoicing, multi-seat management, and dedicated support.</p>
+                         <h4 className="text-[11px] font-black text-white uppercase tracking-widest mb-2 italic">Free vs Indie vs Studio vs Agency?</h4>
+                         <p className="text-[11px] text-zinc-500 leading-relaxed font-medium">Free gives you 1 project with watermarked output — no card needed. Indie is a $119 one-time lifetime license for solo developers (1 seat, BYOA, AI copy). Studio is $49/month for teams up to 3 seats managing 5 apps. Agency is custom-priced for unlimited apps, 10 seats, white-label exports, and invoice billing.</p>
                       </div>
                    </div>
                 </section>

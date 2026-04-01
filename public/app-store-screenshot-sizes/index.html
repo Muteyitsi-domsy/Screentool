@@ -426,6 +426,50 @@
     .step h3 { font-size: .95rem; font-weight: 600; color: #fff; margin-bottom: .25rem; }
     .step p   { font-size: .85rem; color: var(--muted); margin: 0; }
 
+    /* ─── BYOA grid ──────────────────────────────────────── */
+    .byoa-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin-top: 1.75rem;
+    }
+    .byoa-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.35rem 1.2rem;
+    }
+    .byoa-card-icon {
+      font-size: 1.6rem;
+      margin-bottom: .7rem;
+    }
+    .byoa-card h3 {
+      font-size: .95rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: .3rem;
+    }
+    .byoa-card p { font-size: .855rem; color: var(--muted); margin: 0; }
+
+    /* ─── Step cards with icons ──────────────────────────── */
+    .step-icon {
+      font-size: 1.6rem;
+      margin-bottom: .65rem;
+    }
+    .step-badge {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(59,130,246,.25);
+      border-radius: 4px;
+      padding: .15rem .5rem;
+      margin-bottom: .6rem;
+    }
+
     /* ─── FAQ ────────────────────────────────────────────── */
     .faq-list { margin-top: 1.5rem; }
     details {
@@ -504,45 +548,41 @@
           <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6 3v3.5l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        Updated for 2026
+        Used by indie devs and ASO agencies &nbsp;·&nbsp; $0 to get started
       </div>
 
       <h1>
-        App Store <span class="gradient">Screenshot Sizes</span><br />
-        — 2026 Guide
+        App Store screenshots.<br />
+        <span class="gradient">Done in minutes, not days.</span>
       </h1>
 
       <p class="hero-sub">
-        A clear reference for iPhone and Android screenshot dimensions,
-        with a size calculator and free templates to help you create
-        App Store screenshots quickly.
+        Upload once. ScreenFrame exports every device size for iOS and Android — with
+        AI-written copy powered by your own Claude or OpenAI key.
+        No subscription required for solo devs.
       </p>
 
       <div class="hero-btns">
-        <a href="#templates" class="btn btn-primary">
-          Download Free Screenshot Template
+        <a href="/" class="btn btn-primary">
+          Start free — no card needed &rarr;
         </a>
-        <a href="#calculator" class="btn btn-outline">
-          Size Calculator &darr;
+        <a href="#product" class="btn btn-outline">
+          See it in 60 seconds &darr;
         </a>
       </div>
 
       <div class="hero-stats">
         <div class="stat-item">
-          <div class="stat-num">3</div>
-          <div class="stat-label">Required iPhone sizes</div>
+          <div class="stat-num">1 upload</div>
+          <div class="stat-label">Exports every iPhone, iPad &amp; Android size simultaneously</div>
         </div>
         <div class="stat-item">
-          <div class="stat-num">10</div>
-          <div class="stat-label">Max screenshots per device</div>
+          <div class="stat-num">$0 AI cost</div>
+          <div class="stat-label">Bring your own Claude or OpenAI key — you control spend</div>
         </div>
         <div class="stat-item">
-          <div class="stat-num">6.9"</div>
-          <div class="stat-label">Largest required display</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-num">1080×1920</div>
-          <div class="stat-label">Google Play recommended</div>
+          <div class="stat-num">Save projects</div>
+          <div class="stat-label">Screenshots, copy, and layouts stored — update anytime</div>
         </div>
       </div>
     </div>
@@ -580,8 +620,8 @@
           </div>
           <div class="overview-card">
             <div class="overview-card-icon">⚡</div>
-            <h3>Faster workflow</h3>
-            <p>ScreenFrame generates all required sizes in one pass — no manual resizing in a design tool.</p>
+            <h3>Apple &amp; Android kits</h3>
+            <p>Apple Studio generates iPhone + iPad variants simultaneously. Android Studio generates phone, 7-inch, and 10-inch tablet variants — all correctly sized and named.</p>
           </div>
         </div>
       </section>
@@ -838,39 +878,39 @@
            7. FREE TEMPLATE DOWNLOAD
       ═══════════════════════════════════════════════════════ -->
       <section id="templates" aria-labelledby="templates-heading">
-        <h2 id="templates-heading">Free screenshot template pack</h2>
+        <h2 id="templates-heading">Try ScreenFrame free</h2>
         <p class="section-lead">
           Setting up screenshot layouts by hand in a design tool takes 2–4 hours for a
-          first set and at least 30 minutes per update. The free ScreenFrame template pack
-          gives you a ready-to-export starting point.
+          first set and at least 30 minutes per update. ScreenFrame's free tier lets you
+          process and export your first screenshot immediately — no account needed to start.
         </p>
 
         <div class="cta-block">
-          <h3>Free App Store Screenshot Template</h3>
+          <h3>Process your first screenshot free</h3>
           <p>
-            Includes an iPhone frame mockup and all three required App Store export
-            dimensions — ready to use in ScreenFrame.
+            Upload a raw screenshot, auto-generate the iPhone and iPad App Store variants,
+            and download the result — all in under a minute. No credit card required.
           </p>
           <a href="/" class="btn btn-primary" style="display:inline-flex">
-            Download Free Template
+            Open ScreenFrame Free &rarr;
           </a>
         </div>
 
         <div class="overview-grid" style="margin-top:1.5rem">
           <div class="overview-card">
             <div class="overview-card-icon">📱</div>
-            <h3>iPhone frame</h3>
-            <p>Pre-cropped device frame for all three App Store display sizes.</p>
+            <h3>iPhone + iPad in one pass</h3>
+            <p>Both required Apple variants generated from a single upload — 6.9" phone and 12.9" iPad Pro, simultaneously.</p>
           </div>
           <div class="overview-card">
-            <div class="overview-card-icon">🎨</div>
-            <h3>Frame colour finish</h3>
-            <p>Switch between hardware colour finishes for the device frame — no extra tools needed.</p>
+            <div class="overview-card-icon">🗂️</div>
+            <h3>Store-ready filenames</h3>
+            <p>Files are named to App Store Connect conventions based on your app category — no renaming before upload.</p>
           </div>
           <div class="overview-card">
-            <div class="overview-card-icon">📤</div>
-            <h3>Export-ready dimensions</h3>
-            <p>Pre-configured at 1260 × 2736, 1284 × 2778, and 1242 × 2208 — upload straight to App Store Connect.</p>
+            <div class="overview-card-icon">🤖</div>
+            <h3>AI copy on demand</h3>
+            <p>Switch to Copy Design mode to generate a designed screenshot with AI-written headlines and feature copy — your API key, your cost.</p>
           </div>
         </div>
       </section>
@@ -879,44 +919,170 @@
            8. SCREENFRAME PRODUCT INTRO
       ═══════════════════════════════════════════════════════ -->
       <section id="product" aria-labelledby="product-heading">
-        <h2 id="product-heading">Create App Store screenshots faster with ScreenFrame</h2>
+        <h2 id="product-heading">From raw screenshot to full store kit in minutes</h2>
         <p class="section-lead">
-          ScreenFrame is a browser-based tool for indie developers that generates
-          App Store and Google Play screenshots in minutes — no design software required.
+          ScreenFrame is a browser-based tool built for indie developers and small teams.
+          Drop in your raw screenshots and get a complete, store-ready set for Apple
+          and Google Play — correct dimensions, correct filenames, every device covered —
+          without touching a design tool.
         </p>
+
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem">
+          <span style="background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);border-radius:99px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;color:#93c5fd">Apple Studio</span>
+          <span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:99px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;color:#86efac">Android Studio</span>
+          <span style="background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:99px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;color:#c4b5fd">Bring Your Own AI Key</span>
+          <span style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:99px;padding:.3rem .9rem;font-size:.8rem;font-weight:600;color:#fcd34d">Full Resolution Output</span>
+        </div>
 
         <div class="workflow-steps">
           <div class="step">
-            <div class="step-num">1</div>
-            <h3>Insert your screenshot</h3>
-            <p>Drag in a raw simulator screenshot. ScreenFrame auto-detects the device and crops it correctly.</p>
+            <div class="step-icon">📂</div>
+            <div class="step-badge">Step 1</div>
+            <h3>Drop in your screenshots</h3>
+            <p>Upload up to 8 raw app screenshots. ScreenFrame auto-detects and strips system UI — notification bar, Dynamic Island chrome, navigation bar — no manual cropping needed.</p>
           </div>
           <div class="step">
-            <div class="step-num">2</div>
-            <h3>Add a device frame</h3>
-            <p>Switch to frame mode, pick a colour finish, and adjust brightness, contrast, and saturation to taste.</p>
+            <div class="step-icon">🎯</div>
+            <div class="step-badge">Step 2</div>
+            <h3>Pick Apple Studio or Android Studio</h3>
+            <p>Apple Studio targets iPhone 6.9", 6.5", and iPad Pro 12.9" at once. Android Studio covers phone (1080×1920), 7-inch tablet, and 10-inch tablet in a single pass.</p>
           </div>
           <div class="step">
-            <div class="step-num">3</div>
-            <h3>Export App Store–ready images</h3>
-            <p>Download all required sizes in one click — correctly named, correctly sized, ready to upload.</p>
+            <div class="step-icon">⚡</div>
+            <div class="step-badge">Step 3</div>
+            <h3>One click — every variant generated</h3>
+            <p>Full-resolution outputs for every device in your chosen platform. No re-uploading, no resizing by hand. What you download is exactly what gets submitted to the store.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">✍️</div>
+            <div class="step-badge">Step 4 — optional</div>
+            <h3>Add AI-written copy</h3>
+            <p>Switch to Copy Design mode. Describe your app; ScreenFrame generates a designed screenshot — warm background, serif headline, feature pills, device mockup — with copy from Claude or GPT-4o. Your key, your cost, your data.</p>
+          </div>
+          <div class="step">
+            <div class="step-icon">📦</div>
+            <div class="step-badge">Step 5</div>
+            <h3>Export and save</h3>
+            <p>Download a ZIP with subfolders named to store conventions — <code style="font-family:var(--mono);font-size:.8rem;color:#93c5fd">phone/ ipad/</code> for Apple; <code style="font-family:var(--mono);font-size:.8rem;color:#86efac">phone/ tablet_7in/ tablet_10in/</code> for Android. Your project saves automatically — come back and refresh anytime.</p>
           </div>
         </div>
 
         <div class="cta-block">
-          <h3>Stop hand-crafting every screenshot from scratch</h3>
+          <h3>A complete screenshot workflow, not just a resizer</h3>
           <p>
-            ScreenFrame handles every screenshot size, frame, and export format so you can
-            spend your time shipping features instead of resizing PNGs.
+            ScreenFrame handles spec compliance, multi-device rendering, file naming, and — if you want it —
+            AI-generated copy, all in the browser. One slot is free with no account required.
           </p>
           <a href="/" class="btn btn-primary" style="display:inline-flex">
-            Get ScreenFrame Templates &rarr;
+            Open ScreenFrame &rarr;
           </a>
         </div>
       </section>
 
       <!-- ═══════════════════════════════════════════════════
-           9. FAQ — with JSON-LD schema
+           9. BYOA
+      ═══════════════════════════════════════════════════════ -->
+      <section id="byoa" aria-labelledby="byoa-heading">
+        <h2 id="byoa-heading">You bring the AI. We build the screenshots.</h2>
+        <p class="section-lead">
+          Every other screenshot tool bundles AI and charges you monthly to cover their API costs.
+          ScreenFrame is different — connect your own key and pay only for what you actually generate.
+          No markups. No AI tax hidden in your subscription.
+        </p>
+
+        <div class="byoa-grid">
+          <div class="byoa-card">
+            <div class="byoa-card-icon">🟠</div>
+            <h3>Works with Claude</h3>
+            <p>Use your Anthropic API key. Claude writes sharp, App Store-native caption copy tuned to each screenshot's feature.</p>
+          </div>
+          <div class="byoa-card">
+            <div class="byoa-card-icon">🟢</div>
+            <h3>Works with OpenAI</h3>
+            <p>Prefer GPT-4o? Plug in your OpenAI key and use the model you already know — same output quality, same zero-markup billing.</p>
+          </div>
+          <div class="byoa-card">
+            <div class="byoa-card-icon">💸</div>
+            <h3>You control the cost</h3>
+            <p>A typical 8-screenshot set costs pennies in API tokens. No hidden usage limits, no throttling, no upsell at generation time.</p>
+          </div>
+          <div class="byoa-card">
+            <div class="byoa-card-icon">🔒</div>
+            <h3>Your data stays yours</h3>
+            <p>Your key, your calls. Screenshots and copy go directly from your browser to the AI provider — they never touch ScreenFrame's servers.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           10. PRICING
+      ═══════════════════════════════════════════════════════ -->
+      <section id="pricing" aria-labelledby="pricing-heading">
+        <h2 id="pricing-heading">Pricing</h2>
+        <p class="section-lead">
+          Start for free — no account, no credit card. Upgrade when you need more slots
+          or want to save your projects across sessions.
+        </p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:1.5rem">
+
+          <!-- Free -->
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.75rem">
+            <p style="font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Free</p>
+            <p style="font-size:2rem;font-weight:700;color:#fff;line-height:1;margin-bottom:.25rem">$0</p>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.25rem">No account needed</p>
+            <ul style="list-style:none;display:grid;gap:.6rem;font-size:.875rem;color:#d4d4d4;margin-bottom:1.5rem">
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> 1 tray slot</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Apple Studio</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Android Studio</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Full resolution output</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--muted);flex-shrink:0">–</span> <span style="color:var(--muted)">No project saves</span></li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--muted);flex-shrink:0">–</span> <span style="color:var(--muted)">No Copy Design</span></li>
+            </ul>
+            <a href="/" class="btn btn-outline" style="width:100%;justify-content:center">Start free &rarr;</a>
+          </div>
+
+          <!-- Solo -->
+          <div style="background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:1.75rem;position:relative">
+            <span style="position:absolute;top:-1px;right:1.25rem;background:var(--accent);color:#fff;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.25rem .65rem;border-radius:0 0 6px 6px">Most popular</span>
+            <p style="font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem">Solo</p>
+            <p style="font-size:2rem;font-weight:700;color:#fff;line-height:1;margin-bottom:.25rem">$89</p>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.25rem">One-time purchase, no subscription</p>
+            <ul style="list-style:none;display:grid;gap:.6rem;font-size:.875rem;color:#d4d4d4;margin-bottom:1.5rem">
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> 8 tray slots</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Apple Studio + Android Studio</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Full resolution output</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Project saves (sync across devices)</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Copy Design mode (BYOA — Claude or OpenAI)</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> All future updates included</li>
+            </ul>
+            <a href="/" class="btn btn-primary" style="width:100%;justify-content:center">Get Solo &rarr;</a>
+          </div>
+
+          <!-- Agency -->
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.75rem">
+            <p style="font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem">Agency</p>
+            <p style="font-size:2rem;font-weight:700;color:#fff;line-height:1;margin-bottom:.25rem">Custom</p>
+            <p style="font-size:.85rem;color:var(--muted);margin-bottom:1.25rem">For teams and high-volume workflows</p>
+            <ul style="list-style:none;display:grid;gap:.6rem;font-size:.875rem;color:#d4d4d4;margin-bottom:1.5rem">
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Everything in Solo</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Multiple seats</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Volume project saves</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Priority support</li>
+              <li style="display:flex;gap:.6rem;align-items:flex-start"><span style="color:var(--green);flex-shrink:0">✓</span> Custom invoicing available</li>
+            </ul>
+            <a href="mailto:hello@screenframe.app" class="btn btn-outline" style="width:100%;justify-content:center">Contact us &rarr;</a>
+          </div>
+
+        </div>
+
+        <div class="tip-box" role="note" style="margin-top:1.5rem">
+          <strong>Why one-time, not subscription?</strong> ScreenFrame does not charge recurring fees for a tool you use on your own schedule. The $89 Solo licence covers all future updates — pay once, own it.
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════
+           11. FAQ — with JSON-LD schema
       ═══════════════════════════════════════════════════════ -->
       <section id="faq" aria-labelledby="faq-heading">
         <h2 id="faq-heading">Frequently asked questions</h2>
@@ -977,10 +1143,58 @@
           <details>
             <summary>Can I use the same screenshots for the App Store and Google Play?</summary>
             <div class="faq-answer">
-              Not directly — the two stores use different aspect ratios by default. Apple's current required portrait size
+              Not directly — the two stores use different aspect ratios. Apple's current required portrait size
               (1260 × 2736) is approximately 9:19.5, while Google Play's recommended size (1080 × 1920) is exactly 9:16.
-              You'll need to re-crop or create separate exports for each store.
-              ScreenFrame exports both sets simultaneously.
+              You will need separate exports for each store. ScreenFrame's Android Studio handles this — upload once
+              and export phone, 7-inch tablet, and 10-inch tablet variants for Google Play, fully sized and named.
+            </div>
+          </details>
+
+          <details>
+            <summary>What is Copy Design mode and do I need a design background to use it?</summary>
+            <div class="faq-answer">
+              Copy Design mode is an optional output type in ScreenFrame's Apple Studio. Instead of producing a plain full-resolution screenshot,
+              it renders a designed App Store image: warm background, large serif headline, a subheading, three feature pills, and an iPhone mockup
+              with your screenshot inside — the kind of layout that typically takes an hour in a design tool.<br /><br />
+              You describe your app and the feature shown in that screen, and ScreenFrame uses AI to write the headline and supporting copy
+              automatically. No design background needed. You can use your own <strong>Claude API key</strong> (Anthropic) or your own
+              <strong>OpenAI key</strong> (GPT-4o) — whichever you already have. The AI call goes directly to the provider; ScreenFrame is
+              never in the loop. Costs are fractions of a cent per screenshot. iPhone and iPad variants are generated simultaneously, ready to export.
+            </div>
+          </details>
+
+          <details>
+            <summary>How does ScreenFrame generate the iPad screenshot automatically?</summary>
+            <div class="faq-answer">
+              The App Store requires a separate screenshot for iPad Pro (2048 × 2732 px for the 12.9-inch display), which is significantly
+              wider than any iPhone. ScreenFrame handles this automatically using a blurred-background technique: your screenshot is scaled
+              to fill the canvas width, blurred and darkened to create an ambient background, and then a correctly-sized version of the
+              screenshot is composited centred on top. The result fills the full iPad canvas without cropping or distortion —
+              generated in the same processing pass as the iPhone variant, with no extra steps from you.
+            </div>
+          </details>
+
+          <details>
+            <summary>Do I need an AI subscription to use Copy Design mode? How does billing work?</summary>
+            <div class="faq-answer">
+              Copy Design mode uses a bring-your-own-API-key (BYOA) model — you supply your own key from either
+              <strong>Anthropic (Claude)</strong> or <strong>OpenAI (GPT-4o)</strong>.
+              The AI request goes directly from your browser to the provider's servers; ScreenFrame never sees or stores your key.
+              Costs are billed by the provider at standard API rates — fractions of a cent per screenshot — with no markup from ScreenFrame.
+              Your key is saved in your browser so you only need to enter it once per device.<br /><br />
+              Claude key: <a href="https://console.anthropic.com" rel="noopener noreferrer" target="_blank">console.anthropic.com</a> &nbsp;|&nbsp;
+              OpenAI key: <a href="https://platform.openai.com/api-keys" rel="noopener noreferrer" target="_blank">platform.openai.com/api-keys</a>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does ScreenFrame support Android / Google Play screenshots?</summary>
+            <div class="faq-answer">
+              Yes — Android Studio is fully live. Upload your raw screenshots, select Android, and ScreenFrame generates
+              phone (1080 × 1920), 7-inch tablet (600 × 1024), and 10-inch tablet (800 × 1280) variants in one pass.
+              System bars are detected and stripped automatically. The export ZIP uses subfolders
+              (<code style="font-family:monospace">phone/</code>, <code style="font-family:monospace">tablet_7in/</code>, <code style="font-family:monospace">tablet_10in/</code>)
+              with screenshots numbered 01–08 in each folder.
             </div>
           </details>
         </div>
@@ -1058,7 +1272,39 @@
         "name": "Can I use the same screenshots for the App Store and Google Play?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Not directly. Apple's current required portrait size (1260 × 2736) is approximately 9:19.5, while Google Play's recommended size (1080 × 1920) is exactly 9:16. You need to re-crop or create separate exports for each store."
+          "text": "Not directly. Apple's current required portrait size (1260 × 2736) is approximately 9:19.5, while Google Play's recommended size (1080 × 1920) is exactly 9:16. You need separate exports for each store. ScreenFrame's Android Studio generates phone, 7-inch tablet, and 10-inch tablet variants for Google Play from a single upload."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is Copy Design mode for App Store screenshots?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Copy Design mode generates a fully designed App Store screenshot — warm background, large serif headline with italic gold accents, a subheading, feature pills, and an iPhone mockup containing your screenshot. AI writes the copy based on your app description and the feature shown. Both iPhone and iPad variants are generated simultaneously. You can use your own Claude (Anthropic) or OpenAI API key — the call goes directly from your browser to the provider, with no charges from ScreenFrame."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does the iPad App Store screenshot get generated automatically?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The App Store requires a separate iPad Pro screenshot at 2048 × 2732 px (12.9-inch display). ScreenFrame generates this in the same pass as the iPhone variant using a blurred-background technique: the screenshot is scaled to fill the canvas width, blurred and darkened as an ambient background, with a correctly-proportioned version of the screenshot composited centred on top — filling the wider canvas without cropping or distortion."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Do I need an AI subscription to use Copy Design mode? How does billing work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Copy Design mode uses a bring-your-own-API-key (BYOA) model. You supply your own key from either Anthropic (Claude) or OpenAI (GPT-4o); ScreenFrame never stores or forwards it. The AI call goes directly from your browser to the provider's servers. Costs are billed by the provider at standard API rates — fractions of a cent per screenshot — with no markup from ScreenFrame. Your key is saved in your browser so you only enter it once per device."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does ScreenFrame support Android / Google Play screenshots?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes — Android Studio is fully live. Upload your raw screenshots and ScreenFrame generates phone (1080 × 1920), 7-inch tablet (600 × 1024), and 10-inch tablet (800 × 1280) variants in one pass. System bars are detected and stripped automatically. The export ZIP uses subfolders (phone/, tablet_7in/, tablet_10in/) with files numbered 01–08 in each."
         }
       }
     ]

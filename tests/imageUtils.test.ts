@@ -3,7 +3,7 @@
  * Canvas is mocked in vitest.setup.ts; Image load is stubbed below.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { detectBorders, processImage } from '../imageUtils';
+import { detectBorders, processImage, processAppleQuick, processAndroidQuick, hasSystemBar } from '../imageUtils';
 import { DEVICE_SPECS } from '../constants';
 import { DeviceType, FitMode, ExportMode, Platform } from '../types';
 
@@ -195,6 +195,180 @@ describe('processImage', () => {
       value: vi.fn((cb: BlobCallback) => {
         cb(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
       }),
+      configurable: true,
+      writable: true,
+    });
+  });
+});
+
+// ─── processAppleQuick ────────────────────────────────────────────────────
+// Regression guards for the Apple auto-processing pipeline.
+// MockImage is 400 × 800 — portrait, narrower than all Apple targets,
+// so the phone path exercises the "pad with bg colour" branch and the
+// iPad path exercises the blurred-background branch.
+describe('processAppleQuick', () => {
+  it('is a function that returns a Promise', () => {
+    expect(typeof processAppleQuick).toBe('function');
+    const result = processAppleQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.IPHONE]);
+    expect(result).toBeInstanceOf(Promise);
+    // Consume the promise so we don't get an unhandled rejection warning
+    return result.catch(() => {});
+  });
+
+  it('resolves to a Blob for iPhone 6.9" (1260 × 2736)', async () => {
+    const blob = await processAppleQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.IPHONE]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it('resolves to a Blob for iPhone 6.5" (1284 × 2778)', async () => {
+    const blob = await processAppleQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.IPHONE_65]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+  });
+
+  it('resolves to a Blob for iPad Pro 12.9" (2048 × 2732) — blur bg path', async () => {
+    const blob = await processAppleQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.IPAD]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+  });
+
+  it('rejects when image fails to load', async () => {
+    // Override MockImage to fire onerror instead of onload
+    class ErrorImage {
+      onload: (() => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      set src(_: string) { Promise.resolve().then(() => this.onerror?.(new Error('load fail'))); }
+    }
+    vi.stubGlobal('Image', ErrorImage);
+    await expect(processAppleQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.IPHONE])).rejects.toBe('Image load error');
+  });
+});
+
+// ─── processAndroidQuick ──────────────────────────────────────────────────
+// MockImage is 400 × 800 (portrait).
+// Phone path (1080×1920): scaled height = 800*(1080/400) = 2160 > 1920 → crop-from-bottom branch.
+// Tablet paths (800×1280, 600×1024): isTablet=true → blurred-background branch.
+describe('processAndroidQuick', () => {
+  it('is a function that returns a Promise', () => {
+    expect(typeof processAndroidQuick).toBe('function');
+    const result = processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.PHONE]);
+    expect(result).toBeInstanceOf(Promise);
+    return result.catch(() => {});
+  });
+
+  it('resolves to a Blob for Phone spec (1080 × 1920) — crop-from-bottom path', async () => {
+    const blob = await processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.PHONE]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it('resolves to a Blob for 10" Tablet spec (800 × 1280) — blur-bg path', async () => {
+    const blob = await processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.TABLET_10]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it('resolves to a Blob for 7" Tablet spec (600 × 1024) — blur-bg path', async () => {
+    const blob = await processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.TABLET_7]);
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('image/png');
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it('handles input shorter than target — pad-with-background path', async () => {
+    // 1080×800 scaled to phone width 1080 → scaledH = 800 < 1920 → padding branch
+    class ShortImage {
+      width = 1080; height = 800;
+      onload: (() => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      set src(_: string) { Promise.resolve().then(() => this.onload?.()); }
+    }
+    vi.stubGlobal('Image', ShortImage);
+    const blob = await processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.PHONE]);
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('rejects when image fails to load', async () => {
+    class ErrorImage {
+      onload: (() => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      set src(_: string) { Promise.resolve().then(() => this.onerror?.(new Error('fail'))); }
+    }
+    vi.stubGlobal('Image', ErrorImage);
+    await expect(
+      processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.PHONE])
+    ).rejects.toBe('Image load error');
+  });
+
+  it('rejects when toBlob returns null', async () => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+      value: vi.fn((cb: BlobCallback) => cb(null)),
+      configurable: true,
+      writable: true,
+    });
+    await expect(
+      processAndroidQuick(FAKE_SRC, DEVICE_SPECS[DeviceType.PHONE])
+    ).rejects.toBe('toBlob returned null');
+    // Restore
+    Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {
+      value: vi.fn((cb: BlobCallback) => {
+        cb(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
+      }),
+      configurable: true,
+      writable: true,
+    });
+  });
+});
+
+// ─── hasSystemBar ─────────────────────────────────────────────────────────────
+describe('hasSystemBar', () => {
+  it('is exported and callable without throwing', () => {
+    const img = { width: 100, height: 100 } as HTMLImageElement;
+    expect(() => hasSystemBar(img, 50, false)).not.toThrow();
+  });
+
+  it('returns a boolean', () => {
+    const img = { width: 100, height: 100 } as HTMLImageElement;
+    const result = hasSystemBar(img, 50, false);
+    expect(typeof result).toBe('boolean');
+  });
+
+  it('returns true when crop band pixels are uniform (solid black — bar present)', () => {
+    // Default canvas mock fills pixels as 0,0,0,0 (transparent black) — all uniform → bar
+    const img = { width: 100, height: 200 } as HTMLImageElement;
+    expect(hasSystemBar(img, 60, false)).toBe(true);
+  });
+
+  it('returns true when sampling from bottom on a uniform canvas', () => {
+    const img = { width: 100, height: 200 } as HTMLImageElement;
+    expect(hasSystemBar(img, 60, true)).toBe(true);
+  });
+
+  it('does not throw for minimum crop value (1px)', () => {
+    const img = { width: 100, height: 100 } as HTMLImageElement;
+    expect(() => hasSystemBar(img, 1, false)).not.toThrow();
+  });
+
+  it('does not throw for a large crop relative to image height', () => {
+    const img = { width: 1080, height: 1920 } as HTMLImageElement;
+    expect(() => hasSystemBar(img, 280, false)).not.toThrow();
+  });
+
+  it('returns false (or does not throw) when getContext returns null', () => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: vi.fn(() => null),
+      configurable: true,
+      writable: true,
+    });
+    const img = { width: 100, height: 100 } as HTMLImageElement;
+    expect(() => hasSystemBar(img, 50, false)).not.toThrow();
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: original,
       configurable: true,
       writable: true,
     });

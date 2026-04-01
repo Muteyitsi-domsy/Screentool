@@ -6,23 +6,33 @@ import { vi } from 'vitest';
 // jsdom does not implement canvas — we provide a full stub so any code that
 // calls getContext('2d') gets a working (no-op) mock back.
 
+const makeGradient = () => ({ addColorStop: vi.fn() });
+
 const makeCtx = () => ({
   drawImage: vi.fn(),
   clearRect: vi.fn(),
   fillRect: vi.fn(),
+  strokeRect: vi.fn(),
   save: vi.fn(),
   restore: vi.fn(),
   scale: vi.fn(),
   translate: vi.fn(),
   beginPath: vi.fn(),
+  closePath: vi.fn(),
   rect: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
   clip: vi.fn(),
   stroke: vi.fn(),
   arc: vi.fn(),
   roundRect: vi.fn(),
   fill: vi.fn(),
+  fillText: vi.fn(),
+  strokeText: vi.fn(),
   putImageData: vi.fn(),
-  createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+  createLinearGradient: vi.fn(() => makeGradient()),
+  createRadialGradient: vi.fn(() => makeGradient()),
+  measureText: vi.fn(() => ({ width: 100 })),
   createImageData: vi.fn((w: number, h: number) => ({
     data: new Uint8ClampedArray(w * h * 4),
     width: w,
@@ -33,16 +43,20 @@ const makeCtx = () => ({
     width: w,
     height: h,
   })),
-  // writable properties used by imageUtils
+  // writable properties used by imageUtils and copyScreenshot
   filter: '',
   shadowColor: '',
   shadowBlur: 0,
   shadowOffsetY: 0,
+  shadowOffsetX: 0,
   strokeStyle: '',
   lineWidth: 0,
   fillStyle: '' as string | object,
   globalAlpha: 1,
   globalCompositeOperation: 'source-over' as GlobalCompositeOperation,
+  textAlign: 'start' as CanvasTextAlign,
+  textBaseline: 'alphabetic' as CanvasTextBaseline,
+  font: '',
 });
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {

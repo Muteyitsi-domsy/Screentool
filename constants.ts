@@ -13,19 +13,19 @@ export const DEVICE_SPECS: Record<DeviceType, DeviceSpec> = {
   [DeviceType.TABLET_7]: {
     id: DeviceType.TABLET_7,
     name: '7" Android Tablet',
-    width: 1200,
-    height: 1920,
+    width: 600,
+    height: 1024,
     platform: Platform.ANDROID,
-    aspectRatio: '10:16',
+    aspectRatio: '3:5',
     isTablet: true
   },
   [DeviceType.TABLET_10]: {
     id: DeviceType.TABLET_10,
     name: '10" Android Tablet',
-    width: 1600,
-    height: 2560,
+    width: 800,
+    height: 1280,
     platform: Platform.ANDROID,
-    aspectRatio: '10:16',
+    aspectRatio: '5:8',
     isTablet: true
   },
   [DeviceType.CHROMEBOOK]: {
@@ -38,17 +38,17 @@ export const DEVICE_SPECS: Record<DeviceType, DeviceSpec> = {
   },
   [DeviceType.IPHONE]: {
     id: DeviceType.IPHONE,
-    name: 'iPhone 6.7" Display',
-    width: 1290,
-    height: 2796,
+    name: 'iPhone 6.9" Display',
+    width: 1260,
+    height: 2736,
     platform: Platform.APPLE,
     aspectRatio: '9:19.5'
   },
-  [DeviceType.IPHONE_61]: {
-    id: DeviceType.IPHONE_61,
-    name: 'iPhone 6.1" Standard',
-    width: 1179,
-    height: 2556,
+  [DeviceType.IPHONE_65]: {
+    id: DeviceType.IPHONE_65,
+    name: 'iPhone 6.5" Display',
+    width: 1284,
+    height: 2778,
     platform: Platform.APPLE,
     aspectRatio: '9:19.5'
   },

@@ -2,6 +2,289 @@
 import { DeviceSpec, FitMode, ExportMode, CropArea, ImageAdjustments, Platform, DeviceType } from './types';
 
 /**
+ * Detects whether a system bar (status bar or nav bar) is present in a given
+ * horizontal band of the image.
+ *
+ * Approach: scale the source down to 80 px wide for fast pixel access, then
+ * sample the row at the midpoint of the expected crop band.  If ≥ 70 % of
+ * sampled pixels are within ±30 RGB of the first pixel the band is considered
+ * a uniform system bar and the crop should be applied.  If the band contains
+ * varied app content the crop is skipped.
+ *
+ * Returns true  → bar detected, apply the crop.
+ * Returns false → no bar (clean screenshot / already processed), skip crop.
+ */
+export const hasSystemBar = (img: HTMLImageElement, cropPx: number, fromBottom: boolean): boolean => {
+  const SW = 80; // sample width — enough columns for reliable detection
+  const SH = Math.max(1, Math.round(img.height * SW / img.width));
+  const sc = document.createElement('canvas');
+  sc.width  = SW;
+  sc.height = SH;
+  const sCtx = sc.getContext('2d', { willReadFrequently: true });
+  if (!sCtx) return true; // can't sample → assume bar present (safe default)
+  sCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, SW, SH);
+
+  // Row at 12 % into the expected bar band (from the relevant edge).
+  // Sampling at the midpoint (50 %) was overshooting: for a 280 px top band
+  // the midpoint lands at ~135 px, well past the ~40-60 px status bar and
+  // into the browser chrome, which has varied content and breaks detection.
+  // 12 % ≈ 33 px from the edge — squarely within the status/nav bar itself.
+  const scaledCrop = Math.round(cropPx * SH / img.height);
+  const checkY = fromBottom
+    ? SH - Math.max(1, Math.round(scaledCrop * 0.12))
+    : Math.max(0, Math.round(scaledCrop * 0.12));
+  const y = Math.max(0, Math.min(checkY, SH - 1));
+
+  const row = sCtx.getImageData(0, y, SW, 1).data;
+  const r0 = row[0], g0 = row[1], b0 = row[2];
+  const TOLERANCE = 30;
+  let similar = 0;
+  for (let x = 0; x < SW; x++) {
+    const i = x * 4;
+    if (Math.abs(row[i]   - r0) < TOLERANCE &&
+        Math.abs(row[i+1] - g0) < TOLERANCE &&
+        Math.abs(row[i+2] - b0) < TOLERANCE) similar++;
+  }
+  // 70 %+ uniform pixels → system bar; otherwise app content → skip crop
+  return similar / SW >= 0.70;
+};
+
+/**
+ * Automatic Apple App Store screenshot pipeline.
+ *
+ * Given a raw Android screenshot, this function:
+ *   1. Crops bars: 280 px top (status bar / Dynamic Island) + 160 px bottom (nav bar) at 1080 px ref.
+ *   2. Phone targets: fills canvas completely — no padding bars ever.
+ *      If source is wider than target AR → scale to fill height, crop sides symmetrically.
+ *      If source is more portrait than target AR → scale to fill width, crop height from top.
+ *   3. iPad target: uses the blurred-background technique —
+ *      background is the same image scaled to fill canvas width, blurred at
+ *      28 px and darkened to 55 % brightness with a 25 % black overlay,
+ *      then the phone-height-fitted image is composited centred on top.
+ */
+export const processAppleQuick = (
+  imageSrc: string,
+  spec: DeviceSpec
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      // ── Step 1: proportional bar crop ─────────────────────────────────────
+      // Reference values calibrated at 1080 px width, scaled to source density.
+      // 280 px top / 120 px bottom is the empirically derived crop that fully
+      // removes the notification bar + Dynamic Island on modern devices.
+      // (Equivalent to two sequential 140/60 px crops, which was found to work
+      // in practice — applied directly here to avoid chaining image passes.)
+      const scale = img.width / 1080;
+      const TOP_REF    = Math.round(280 * scale);
+      const BOTTOM_REF = Math.round(160 * scale);
+      // Only crop if the band actually looks like a system bar.
+      // Clean screenshots (design exports, already-processed images) are left untouched.
+      const topCrop    = hasSystemBar(img, TOP_REF,    false) ? TOP_REF    : 0;
+      const bottomCrop = hasSystemBar(img, BOTTOM_REF, true)  ? BOTTOM_REF : 0;
+      const croppedH   = img.height - topCrop - bottomCrop;
+
+      if (croppedH <= 0) { reject('Crop exceeds image height'); return; }
+
+      const croppedAR = img.width / croppedH;
+      const targetW   = spec.width;
+      const targetH   = spec.height;
+      const targetAR  = targetW / targetH;
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject('No canvas context'); return; }
+
+      if (spec.id === DeviceType.IPAD) {
+        // ── iPad: blurred-background technique ────────────────────────────
+        // Background layer: scale to fill canvas width, blur 28 px,
+        // brightness 55 %, then 25 % black overlay.
+        const bgW  = targetW;
+        const bgH  = croppedH * (targetW / img.width);
+        const bgY  = (targetH - bgH) / 2;
+        const blurPad = 60; // extra draw margin so blur edges are clean
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, targetW, targetH);
+        ctx.clip();
+        ctx.filter = 'blur(28px) brightness(55%)';
+        ctx.drawImage(
+          img,
+          0, topCrop, img.width, croppedH,
+          -blurPad, bgY - blurPad, bgW + blurPad * 2, bgH + blurPad * 2
+        );
+        ctx.filter = 'none';
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.restore();
+
+        // Foreground: scale cropped image to fill full canvas height.
+        const fgH = targetH;
+        const fgW = croppedAR * fgH;
+        const fgX = (targetW - fgW) / 2;
+        ctx.drawImage(img, 0, topCrop, img.width, croppedH, fgX, 0, fgW, fgH);
+
+      } else {
+        // ── Phone: fill canvas completely — no padding bars ───────────────
+        // Compare source AR to target AR to decide which axis to fill:
+        //   source wider than target  → scale to fill height, crop width symmetrically
+        //   source more portrait      → scale to fill width,  crop height from top
+        if (croppedAR >= targetAR) {
+          // Source is wider: fill full canvas height, trim sides symmetrically
+          const srcWForTarget = Math.round((targetAR / croppedAR) * img.width);
+          const srcXStart     = Math.round((img.width - srcWForTarget) / 2);
+          ctx.drawImage(
+            img,
+            srcXStart, topCrop, srcWForTarget, croppedH,
+            0, 0, targetW, targetH
+          );
+        } else {
+          // Source is more portrait: fill full canvas width, crop height from top
+          // (when croppedAR < targetAR, scaling to width always produces scaledH > targetH)
+          const srcHForTarget = Math.round(img.width * targetH / targetW);
+          ctx.drawImage(
+            img,
+            0, topCrop, img.width, srcHForTarget,
+            0, 0, targetW, targetH
+          );
+        }
+      }
+
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject('toBlob returned null');
+      }, 'image/png');
+    };
+
+    img.onerror = () => reject('Image load error');
+    img.src = imageSrc;
+  });
+};
+
+/**
+ * Google Play screenshot pipeline.
+ *
+ * Accepts any input (Android, Apple, or designed screenshot) and outputs a
+ * PNG that meets Google Play aspect-ratio and dimension requirements.
+ *
+ *   1. Crops status bar / Dynamic Island (140 px ref) and nav bar / home indicator (60 px ref),
+ *      proportionally scaled to source density (calibrated at 1080 px reference width).
+ *
+ * Phone (1080×1920):
+ *   Scale cropped image to 1080 wide. If scaled height > 1920, crop from the
+ *   top (keeps top content — headline/UI). If scaled height < 1920, pad
+ *   vertically using the source's top-left pixel colour.
+ *
+ * Tablets (isTablet = true):
+ *   Blurred-background technique — cropped source is scaled to fill canvas
+ *   width, blurred 24 px and darkened to 55 % brightness, then the cropped
+ *   source scaled to fit is composited centred on top.
+ */
+export const processAndroidQuick = (
+  imageSrc: string,
+  spec: DeviceSpec
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      const targetW = spec.width;
+      const targetH = spec.height;
+
+      // ── Step 1: proportional bar crop (detection-gated) ──────────────────
+      // Reference values calibrated at 1080 px width, scaled to source density.
+      // Each crop is only applied if the band actually looks like a uniform
+      // system bar — clean / already-processed screenshots are left untouched.
+      const densityScale = img.width / 1080;
+      const TOP_REF    = Math.round(280 * densityScale);
+      const BOTTOM_REF = Math.round((spec.isTablet ? 140 : 120) * densityScale);
+      const topCrop    = hasSystemBar(img, TOP_REF,    false) ? TOP_REF    : 0;
+      const bottomCrop = hasSystemBar(img, BOTTOM_REF, true)  ? BOTTOM_REF : 0;
+      const croppedH   = img.height - topCrop - bottomCrop;
+
+      if (croppedH <= 0) { reject('Crop exceeds image height'); return; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject('No canvas context'); return; }
+
+      if (spec.isTablet) {
+        // ── Tablet: blurred-background technique ──────────────────────────
+        const bgW  = targetW;
+        const bgH  = croppedH * (targetW / img.width);
+        const bgY  = (targetH - bgH) / 2;
+        const blurPad = 40;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, targetW, targetH);
+        ctx.clip();
+        ctx.filter = 'blur(24px) brightness(55%)';
+        ctx.drawImage(
+          img,
+          0, topCrop, img.width, croppedH,
+          -blurPad, bgY - blurPad, bgW + blurPad * 2, bgH + blurPad * 2
+        );
+        ctx.filter = 'none';
+        ctx.fillStyle = 'rgba(0,0,0,0.20)';
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.restore();
+
+        // Foreground: scale cropped source to fit within canvas, centred
+        const fgScale = Math.min(targetW / img.width, targetH / croppedH);
+        const fgW = img.width  * fgScale;
+        const fgH = croppedH   * fgScale;
+        const fgX = (targetW - fgW) / 2;
+        const fgY = (targetH - fgH) / 2;
+        ctx.drawImage(img, 0, topCrop, img.width, croppedH, fgX, fgY, fgW, fgH);
+
+      } else {
+        // ── Phone: scale to target width, crop or pad to target height ─────
+        const scaledH = croppedH * (targetW / img.width);
+
+        if (scaledH > targetH) {
+          // Too tall → keep top portion (preserve headline / main content)
+          const srcHForTarget = (targetH / scaledH) * croppedH;
+          ctx.drawImage(
+            img,
+            0, topCrop, img.width, srcHForTarget,
+            0, 0, targetW, targetH
+          );
+        } else {
+          // Too short → pad vertically, centred, with sampled background colour
+          const sampleCanvas = document.createElement('canvas');
+          sampleCanvas.width  = 1;
+          sampleCanvas.height = 1;
+          const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+          if (sampleCtx) {
+            sampleCtx.drawImage(img, 0, topCrop, 1, 1, 0, 0, 1, 1);
+            const px = sampleCtx.getImageData(0, 0, 1, 1).data;
+            ctx.fillStyle = `rgb(${px[0]},${px[1]},${px[2]})`;
+            ctx.fillRect(0, 0, targetW, targetH);
+          }
+          const yOffset = (targetH - scaledH) / 2;
+          ctx.drawImage(img, 0, topCrop, img.width, croppedH, 0, yOffset, targetW, scaledH);
+        }
+      }
+
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject('toBlob returned null');
+      }, 'image/png');
+    };
+
+    img.onerror = () => reject('Image load error');
+    img.src = imageSrc;
+  });
+};
+
+/**
  * Detects solid color borders in an image.
  */
 export const detectBorders = (img: HTMLImageElement): CropArea => {

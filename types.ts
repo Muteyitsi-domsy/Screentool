@@ -10,7 +10,7 @@ export enum DeviceType {
   TABLET_10 = 'TABLET_10',
   CHROMEBOOK = 'CHROMEBOOK',
   IPHONE = 'IPHONE',
-  IPHONE_61 = 'IPHONE_61',
+  IPHONE_65 = 'IPHONE_65',
   IPAD = 'IPAD'
 }
 
@@ -26,9 +26,16 @@ export enum ExportMode {
 }
 
 export enum AppView {
+  APPLE = 'APPLE',
+  ANDROID = 'ANDROID',
   EDITOR = 'EDITOR',
   TRAY = 'TRAY',
   FAQ = 'FAQ'
+}
+
+export enum OutputMode {
+  FULL_RES = 'FULL_RES',
+  COPY_DESIGN = 'COPY_DESIGN'
 }
 
 export interface CropArea {

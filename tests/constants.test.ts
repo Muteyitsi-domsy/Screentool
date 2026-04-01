@@ -44,28 +44,37 @@ describe('DEVICE_SPECS', () => {
   });
 });
 
-// ─── Apple specs (App Store minimums) ────────────────────────────────────
+// ─── Apple specs (App Store required dimensions) ──────────────────────────
+// Source of truth: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 describe('Apple device specs', () => {
-  it('iPhone 6.7" meets App Store minimum resolution', () => {
+  it('iPhone 6.9" matches App Store required dimensions (1260 × 2736)', () => {
     const spec = DEVICE_SPECS[DeviceType.IPHONE];
     expect(spec.platform).toBe(Platform.APPLE);
-    expect(spec.width).toBe(1290);
-    expect(spec.height).toBe(2796);
+    expect(spec.width).toBe(1260);
+    expect(spec.height).toBe(2736);
   });
 
-  it('iPhone 6.1" meets App Store minimum resolution', () => {
-    const spec = DEVICE_SPECS[DeviceType.IPHONE_61];
+  it('iPhone 6.5" matches App Store required dimensions (1284 × 2778)', () => {
+    const spec = DEVICE_SPECS[DeviceType.IPHONE_65];
     expect(spec.platform).toBe(Platform.APPLE);
-    expect(spec.width).toBe(1179);
-    expect(spec.height).toBe(2556);
+    expect(spec.width).toBe(1284);
+    expect(spec.height).toBe(2778);
   });
 
-  it('iPad Pro 12.9" meets App Store minimum resolution', () => {
+  it('iPad Pro 12.9" matches App Store required dimensions (2048 × 2732)', () => {
     const spec = DEVICE_SPECS[DeviceType.IPAD];
     expect(spec.platform).toBe(Platform.APPLE);
     expect(spec.isTablet).toBe(true);
     expect(spec.width).toBe(2048);
     expect(spec.height).toBe(2732);
+  });
+
+  it('all Apple specs are portrait (height > width)', () => {
+    const applePhones = [DeviceType.IPHONE, DeviceType.IPHONE_65];
+    for (const dt of applePhones) {
+      const spec = DEVICE_SPECS[dt];
+      expect(spec.height, `${spec.name} should be portrait`).toBeGreaterThan(spec.width);
+    }
   });
 });
 
@@ -82,16 +91,16 @@ describe('Android device specs', () => {
     const spec = DEVICE_SPECS[DeviceType.TABLET_7];
     expect(spec.platform).toBe(Platform.ANDROID);
     expect(spec.isTablet).toBe(true);
-    expect(spec.width).toBe(1200);
-    expect(spec.height).toBe(1920);
+    expect(spec.width).toBe(600);
+    expect(spec.height).toBe(1024);
   });
 
   it('10" Tablet has correct dimensions and isTablet flag', () => {
     const spec = DEVICE_SPECS[DeviceType.TABLET_10];
     expect(spec.platform).toBe(Platform.ANDROID);
     expect(spec.isTablet).toBe(true);
-    expect(spec.width).toBe(1600);
-    expect(spec.height).toBe(2560);
+    expect(spec.width).toBe(800);
+    expect(spec.height).toBe(1280);
   });
 
   it('Chromebook is landscape (width > height)', () => {

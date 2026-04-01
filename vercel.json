@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/app-store-screenshot-sizes", "destination": "/app-store-screenshot-sizes/index.html" },
+    { "source": "/app-store-screenshot-sizes/", "destination": "/app-store-screenshot-sizes/index.html" },
+    { "source": "/privacy", "destination": "/privacy/index.html" },
+    { "source": "/privacy/", "destination": "/privacy/index.html" },
+    { "source": "/terms", "destination": "/terms/index.html" },
+    { "source": "/terms/", "destination": "/terms/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

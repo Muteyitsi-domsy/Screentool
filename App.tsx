@@ -6,6 +6,7 @@ import {
   DeviceType,
   FitMode,
   ExportMode,
+  OutputMode,
   ProcessingState,
   CropArea,
   ImageAdjustments,
@@ -19,10 +20,42 @@ import { DEVICE_SPECS } from './constants';
 import DeviceMockup from './components/DeviceMockup';
 import CropEditor from './components/CropEditor';
 import AuthModal from './components/AuthModal';
-import { processImage, detectBorders } from './imageUtils';
+import { processImage, detectBorders, processAppleQuick, processAndroidQuick } from './imageUtils';
 import { saveProjectToDB, getAllProjectsFromDB, deleteProjectFromDB } from './db';
 import { useAuth } from './hooks/useAuth';
 import { initLemonSqueezy, openLemonSqueezyCheckout } from './lib/lemonsqueezy';
+import { generateScreenshotCopy, generateCopy, AiProvider } from './lib/claudeApi';
+import { renderCopyDesign, CopyData } from './lib/copyScreenshot';
+
+// ─── Apple category → ordered slot names for screenshot naming ────────────────
+const APPLE_CATEGORIES = {
+  journaling: {
+    label: 'Journaling / Self-Development',
+    slots: ['hero_explainer', 'daily_home', 'free_feature', 'unique_feature', 'ai_insights', 'progress_tracking', 'paywall', 'full_menu']
+  },
+  productivity: {
+    label: 'Productivity / Task Manager',
+    slots: ['hero_overview', 'task_creation', 'calendar_view', 'focus_mode', 'reminders', 'progress', 'paywall', 'settings']
+  },
+  health: {
+    label: 'Health & Fitness',
+    slots: ['hero_dashboard', 'workout_tracker', 'nutrition_log', 'progress_charts', 'streaks', 'community', 'paywall', 'overview']
+  },
+  finance: {
+    label: 'Finance / Budgeting',
+    slots: ['portfolio_overview', 'transaction_log', 'budgets', 'analytics', 'goals', 'insights', 'paywall', 'settings']
+  },
+  social: {
+    label: 'Social / Communication',
+    slots: ['feed_home', 'messaging', 'profile', 'discovery', 'notifications', 'groups', 'paywall', 'settings']
+  },
+  general: {
+    label: 'General App',
+    slots: ['hero', 'feature_one', 'feature_two', 'feature_three', 'feature_four', 'feature_five', 'paywall', 'overview']
+  }
+} as const;
+
+type AppleCategory = keyof typeof APPLE_CATEGORIES;
 
 // Pro launch date — countdown shown in UI until this passes
 const LAUNCH_DATE = new Date('2026-03-27T09:00:00').getTime();
@@ -88,7 +121,7 @@ const App: React.FC = () => {
     frameColor: '#1a1a1a',
     cropArea: { x: 0, y: 0, width: 100, height: 100 },
     adjustments: { ...NEUTRAL_BASELINE },
-    activeView: AppView.EDITOR,
+    activeView: AppView.APPLE,
     tray: Array(8).fill(null),
     isPro: false
   });
@@ -109,11 +142,56 @@ const App: React.FC = () => {
   const [draggedSlotIdx, setDraggedSlotIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const [isRevision, setIsRevision] = useState(false);
+  const [revisionSourceSlotIndex, setRevisionSourceSlotIndex] = useState<number | null>(null);
+  const [revisionSourceItemId, setRevisionSourceItemId] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [countdown, setCountdown] = useState(computeCountdown);
 
   const [pendingUpgrade, setPendingUpgrade] = useState<'subscription' | 'lifetime' | null>(null);
+
+  // Apple Quick Process state
+  const [appleFiles, setAppleFiles] = useState<File[]>([]);
+  const [appleDevice, setAppleDevice] = useState<DeviceType>(DeviceType.IPHONE_65);
+  const [appleCategory, setAppleCategory] = useState<AppleCategory>('journaling');
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+
+  // Tray preview toggle — switches between iPhone and iPad preview across all slots
+  const [trayPreview, setTrayPreview] = useState<'phone' | 'ipad'>('phone');
+
+  // Copy Design mode state
+  const [outputMode, setOutputMode] = useState<OutputMode>(OutputMode.FULL_RES);
+  const [copyAppName, setCopyAppName] = useState('');
+  const [copyDescription, setCopyDescription] = useState('');
+  const [copySegment, setCopySegment] = useState('');
+  const [copyFeatures, setCopyFeatures] = useState<string[]>([]);
+  // API key is persisted in localStorage so Pro users don't re-enter it each session
+  const [claudeApiKey, setClaudeApiKey] = useState<string>(
+    () => localStorage.getItem('sf_claude_api_key') ?? ''
+  );
+  const [openaiApiKey, setOpenaiApiKey] = useState<string>(
+    () => localStorage.getItem('sf_openai_api_key') ?? ''
+  );
+  const [aiProvider, setAiProvider] = useState<'claude' | 'openai'>(
+    () => (localStorage.getItem('sf_ai_provider') as 'claude' | 'openai') ?? 'claude'
+  );
+
+  // Free-tier locked screenshot slots — files that exceeded the 1-slot free limit
+  const [trayLockedFiles, setTrayLockedFiles] = useState<Array<{
+    name: string;
+    seq: string;
+    slotName: string;
+  }>>([]);
+
+  // Android Studio state
+  const [androidFiles, setAndroidFiles] = useState<File[]>([]);
+  const [androidCategory, setAndroidCategory] = useState<AppleCategory>('general');
+  // Tray preview toggle for Android items — phone / 7-inch / 10-inch
+  const [androidTrayPreview, setAndroidTrayPreview] = useState<'phone' | '7in' | '10in'>('phone');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const appleFileInputRef = useRef<HTMLInputElement>(null);
+  const androidFileInputRef = useRef<HTMLInputElement>(null);
   const settingsScrollRef = useRef<HTMLDivElement>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -161,6 +239,39 @@ const App: React.FC = () => {
   useEffect(() => {
     setState(prev => ({ ...prev, frameColor: '#1a1a1a' }));
   }, [state.selectedDevice]);
+
+  // Persist API key to localStorage whenever it changes
+  useEffect(() => {
+    if (claudeApiKey) {
+      localStorage.setItem('sf_claude_api_key', claudeApiKey);
+    } else {
+      localStorage.removeItem('sf_claude_api_key');
+    }
+  }, [claudeApiKey]);
+
+  useEffect(() => {
+    if (openaiApiKey) localStorage.setItem('sf_openai_api_key', openaiApiKey);
+    else localStorage.removeItem('sf_openai_api_key');
+  }, [openaiApiKey]);
+
+  useEffect(() => {
+    localStorage.setItem('sf_ai_provider', aiProvider);
+  }, [aiProvider]);
+
+  // Clear locked slots when user upgrades to Pro
+  useEffect(() => {
+    if (state.isPro) setTrayLockedFiles([]);
+  }, [state.isPro]);
+
+  // Keep copyFeatures array in sync with appleFiles count
+  useEffect(() => {
+    setCopyFeatures(prev => {
+      if (prev.length === appleFiles.length) return prev;
+      const next = [...prev];
+      while (next.length < appleFiles.length) next.push('');
+      return next.slice(0, appleFiles.length);
+    });
+  }, [appleFiles.length]);
 
   const checkSettingsScroll = () => {
     const el = settingsScrollRef.current;
@@ -307,28 +418,35 @@ const App: React.FC = () => {
   };
 
   const editCopyFromTray = (id: string) => {
+    const doLoad = () => {
+      const slotIndex = state.tray.findIndex(i => i?.id === id);
+      const item = slotIndex !== -1 ? state.tray[slotIndex] : null;
+      if (!item) return;
+
+      // Load the phone variant for manual revision (iPad/tablet variants are re-generated on re-process)
+      const primaryVariant = item.variants.find(v => v.deviceType !== DeviceType.IPAD) ?? item.variants[0];
+
+      setState(prev => ({
+        ...prev,
+        image: primaryVariant.renderedImageUrl,
+        cropArea: { x: 0, y: 0, width: 100, height: 100 },
+        adjustments: { ...NEUTRAL_BASELINE },
+        activeView: AppView.EDITOR
+      }));
+      setRevisionSourceSlotIndex(slotIndex);
+      setRevisionSourceItemId(id);
+      setIsRevision(true);
+    };
+
     if (state.image) {
-      showAlert(
-        "Editor Occupied",
-        "Finish or discard your current edit before revising a tray screenshot."
+      showConfirm(
+        'Replace Editor Content?',
+        'The editor already has an image loaded. Replace it with this processed screenshot?',
+        doLoad
       );
       return;
     }
-
-    const item = state.tray.find(i => i?.id === id);
-    if (!item) return;
-
-    // Use primary variant as base for revision
-    const primaryVariant = item.variants[0];
-
-    setState(prev => ({
-      ...prev,
-      image: primaryVariant.renderedImageUrl,
-      cropArea: { x: 0, y: 0, width: 100, height: 100 },
-      adjustments: { ...NEUTRAL_BASELINE },
-      activeView: AppView.EDITOR
-    }));
-    setIsRevision(true);
+    doLoad();
   };
 
   const getExportFilename = (spec: DeviceSpec, mode: ExportMode, index: number): string => {
@@ -339,13 +457,13 @@ const App: React.FC = () => {
     let size = '';
 
     switch (spec.id) {
-      case DeviceType.PHONE: device = 'phone'; break;
-      case DeviceType.TABLET_7: device = 'tablet'; size = '7in'; break;
-      case DeviceType.TABLET_10: device = 'tablet'; size = '10in'; break;
+      case DeviceType.PHONE:      device = 'phone'; break;
+      case DeviceType.TABLET_7:   device = 'tablet'; size = '7in'; break;
+      case DeviceType.TABLET_10:  device = 'tablet'; size = '10in'; break;
       case DeviceType.CHROMEBOOK: device = 'chromebook'; break;
-      case DeviceType.IPHONE: device = 'phone'; size = '6.7'; break;
-      case DeviceType.IPHONE_61: device = 'phone'; size = '6.1'; break;
-      case DeviceType.IPAD: device = 'tablet'; size = '12.9'; break;
+      case DeviceType.IPHONE:     device = 'phone'; size = '6.9'; break;
+      case DeviceType.IPHONE_65:  device = 'phone'; size = '6.5'; break;
+      case DeviceType.IPAD:       device = 'tablet'; size = '12.9'; break;
     }
 
     const segments = [platform, device, size, modeLabel, idx].filter(s => s !== '');
@@ -371,8 +489,8 @@ const App: React.FC = () => {
       showAlert("Upload Error", "File size exceeds 8MB limit.");
       return;
     }
-    if (!file.type.startsWith('image/')) {
-      showAlert("Upload Error", "Please upload a valid image file.");
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+      showAlert("Upload Error", "Please upload a PNG, JPEG, or WebP screenshot.");
       return;
     }
     const reader = new FileReader();
@@ -411,23 +529,37 @@ const App: React.FC = () => {
   };
 
   const addToTray = async () => {
-    const currentTrayCount = state.tray.filter(x => x !== null).length;
-
-    // Anonymous or free user hits 1-slot limit → prompt upgrade
-    if (!auth.user && currentTrayCount >= 1) {
-      showUpgradeModal();
-      return;
-    }
-
-    if (!state.isPro && currentTrayCount >= 1) {
-      showUpgradeModal();
-      return;
-    }
-
     if (!state.image || isAddingToTray) return;
 
-    const emptySlotIndex = state.tray.findIndex(slot => slot === null);
-    if (emptySlotIndex === -1) {
+    // Revisions replace their original slot — skip the tier upgrade check
+    // (the tray count doesn't increase when replacing an existing slot).
+    const isReplacingSlot =
+      isRevision &&
+      revisionSourceSlotIndex !== null &&
+      revisionSourceItemId !== null &&
+      state.tray[revisionSourceSlotIndex]?.id === revisionSourceItemId;
+
+    if (!isReplacingSlot) {
+      const currentTrayCount = state.tray.filter(x => x !== null).length;
+      // Anonymous or free user hits 1-slot limit → prompt upgrade
+      if (!auth.user && currentTrayCount >= 1) {
+        showUpgradeModal();
+        return;
+      }
+      if (!state.isPro && currentTrayCount >= 1) {
+        showUpgradeModal();
+        return;
+      }
+    }
+
+    // Determine target slot:
+    //   - Revision replacing its original slot → use that slot index
+    //   - Everything else (new item, or revision whose slot was reordered) → first empty slot
+    const targetSlotIndex = isReplacingSlot
+      ? revisionSourceSlotIndex!
+      : state.tray.findIndex(slot => slot === null);
+
+    if (targetSlotIndex === -1) {
       showAlert("Tray Full", "Export tray is full. Please remove an item first.");
       return;
     }
@@ -438,15 +570,18 @@ const App: React.FC = () => {
       const activeSpec = DEVICE_SPECS[state.selectedDevice];
       const targetPlatform = activeSpec.platform;
 
+      // Preserve the original item's index when replacing, so filenames don't change.
+      const existingItem = isReplacingSlot ? state.tray[targetSlotIndex] : null;
       const bucketItems = state.tray.filter(item =>
         item !== null &&
         item.platform === targetPlatform &&
         item.exportMode === state.exportMode
       );
       const maxIndexInBucket = bucketItems.reduce((max, item) => Math.max(max, item!.index), 0);
-      const calculatedIndex = maxIndexInBucket + 1;
+      const calculatedIndex = existingItem ? existingItem.index : maxIndexInBucket + 1;
 
-      const targetSpecs = Object.values(DEVICE_SPECS).filter(s => s.platform === targetPlatform);
+      // Single-device variant — user has chosen the target device explicitly.
+      const targetSpecs = [DEVICE_SPECS[state.selectedDevice]];
 
       const variantPromises = targetSpecs.map(async (spec): Promise<TrayVariant> => {
         const renderedBlob = await processImage(
@@ -483,10 +618,12 @@ const App: React.FC = () => {
 
       setState(prev => {
         const newTray = [...prev.tray];
-        newTray[emptySlotIndex] = newItem;
+        newTray[targetSlotIndex] = newItem;
         return { ...prev, tray: newTray };
       });
       setIsRevision(false);
+      setRevisionSourceSlotIndex(null);
+      setRevisionSourceItemId(null);
     } catch (err) {
       console.error("Capture fan-out failure:", err);
       showAlert("System Error", "Failed to generate multi-device kit variants.");
@@ -554,26 +691,46 @@ const App: React.FC = () => {
     setIsExporting(targetPlatform);
 
     try {
-      const platformLabel = targetPlatform.toLowerCase();
-      const finalZipName = `${platformLabel}_platform_kit.zip`;
       const zip = new JSZip();
 
-      const rectFolder = zip.folder("full_resolution");
-      const mockupFolder = zip.folder("mockups");
-
-      trayItems.forEach(item => {
-        const targetFolder = item.exportMode === ExportMode.RECTANGLE ? rectFolder : mockupFolder;
-
-        item.variants.forEach(variant => {
-          targetFolder?.file(variant.filename, variant.renderedBlob);
+      if (targetPlatform === Platform.APPLE) {
+        // Subfolders group all screenshots of the same device together.
+        // File explorer sorts within each folder by sequence number (01–08).
+        const phoneFolder = zip.folder('phone')!;
+        const ipadFolder  = zip.folder('ipad')!;
+        trayItems.forEach(item => {
+          const v = item.variants.find(v => v.deviceType !== DeviceType.IPAD) ?? item.variants[0];
+          if (v) phoneFolder.file(v.filename, v.renderedBlob);
         });
-      });
+        trayItems.forEach(item => {
+          const v = item.variants.find(v => v.deviceType === DeviceType.IPAD);
+          if (v) ipadFolder.file(v.filename, v.renderedBlob);
+        });
+      } else {
+        // Android: phone → 7" tablet → 10" tablet (one subfolder per device)
+        const phoneFolder   = zip.folder('phone')!;
+        const tablet7Folder = zip.folder('tablet_7in')!;
+        const tablet10Folder = zip.folder('tablet_10in')!;
+        trayItems.forEach(item => {
+          const v = item.variants.find(v => v.deviceType === DeviceType.PHONE);
+          if (v) phoneFolder.file(v.filename, v.renderedBlob);
+        });
+        trayItems.forEach(item => {
+          const v = item.variants.find(v => v.deviceType === DeviceType.TABLET_7);
+          if (v) tablet7Folder.file(v.filename, v.renderedBlob);
+        });
+        trayItems.forEach(item => {
+          const v = item.variants.find(v => v.deviceType === DeviceType.TABLET_10);
+          if (v) tablet10Folder.file(v.filename, v.renderedBlob);
+        });
+      }
 
+      const zipName = targetPlatform === Platform.APPLE ? 'apple_screenshots.zip' : 'android_screenshots.zip';
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
       a.href = url;
-      a.download = finalZipName;
+      a.download = zipName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -581,8 +738,8 @@ const App: React.FC = () => {
 
       setShowSuccess(true);
     } catch (err) {
-      console.error("Batch crash:", err);
-      showAlert("Export Error", "Batch engine failed to build platform kit ZIP.");
+      console.error("Export error:", err);
+      showAlert("Export Error", "Batch engine failed to build screenshot ZIP.");
     } finally {
       setIsExporting(null);
     }
@@ -607,6 +764,360 @@ const App: React.FC = () => {
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
     // The useEffect watching auth.user will open Lemon Squeezy checkout if pendingUpgrade is set
+  };
+
+  const getPreviewVariant = (item: TrayItem) => {
+    if (item.platform === Platform.ANDROID) {
+      if (androidTrayPreview === '7in')  return item.variants.find(v => v.deviceType === DeviceType.TABLET_7)  ?? item.variants[0];
+      if (androidTrayPreview === '10in') return item.variants.find(v => v.deviceType === DeviceType.TABLET_10) ?? item.variants[0];
+      return item.variants.find(v => v.deviceType === DeviceType.PHONE) ?? item.variants[0];
+    }
+    if (trayPreview === 'ipad') {
+      return item.variants.find(v => v.deviceType === DeviceType.IPAD) ?? item.variants[0];
+    }
+    return item.variants.find(v => v.deviceType !== DeviceType.IPAD) ?? item.variants[0];
+  };
+
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleCopyDesignProcess = async () => {
+    const activeKey = aiProvider === 'claude' ? claudeApiKey.trim() : openaiApiKey.trim();
+    if (!activeKey) {
+      showAlert('Missing API Key', 'Please enter your API key in the sidebar to use Copy Design mode.');
+      return;
+    }
+    if (!copyAppName.trim()) {
+      showAlert('Missing App Name', 'Please enter your app name in the sidebar.');
+      return;
+    }
+    if (!copyDescription.trim()) {
+      showAlert('Missing Description', 'Please describe your app in the sidebar.');
+      return;
+    }
+
+    const currentTrayCount = state.tray.filter(x => x !== null).length;
+    const emptySlots       = state.tray.filter(s => s === null).length;
+    const isFree           = !auth.user || !state.isPro;
+    const FREE_LIMIT       = 1;
+    // How many new screenshots a free user can still add
+    const canProcess       = isFree ? Math.max(0, FREE_LIMIT - currentTrayCount) : emptySlots;
+
+    if (emptySlots === 0) {
+      showAlert('Tray Full', 'All 8 slots are occupied. Remove an item from the tray first.');
+      return;
+    }
+
+    // Free user already at limit — nothing to process, show upgrade immediately
+    if (canProcess === 0) { showUpgradeModal(); return; }
+
+    const filesToProcess = appleFiles.slice(0, canProcess);
+    const filesToLock    = isFree ? appleFiles.slice(canProcess) : [];
+
+    setIsProcessingBatch(true);
+    setBatchProgress(0);
+
+    const phoneSpec    = DEVICE_SPECS[appleDevice];
+    const ipadSpec     = DEVICE_SPECS[DeviceType.IPAD];
+    const category     = APPLE_CATEGORIES[appleCategory];
+    const processedItems: TrayItem[] = [];
+
+    try {
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file      = filesToProcess[i];
+        const slotName  = category.slots[i] ?? `screenshot_${i + 1}`;
+        const seq       = String(currentTrayCount + i + 1).padStart(2, '0');
+        const phoneFilename = `${seq}_${slotName}_designed.png`;
+        const ipadFilename  = `${seq}_${slotName}_designed_ipad.png`;
+        const dataUrl   = await fileToDataUrl(file);
+
+        // Generate copy via AI provider
+        const featureText = copyFeatures[i]?.trim() || slotName.replace(/_/g, ' ');
+        const generated = await generateCopy(
+          aiProvider,
+          aiProvider === 'claude' ? claudeApiKey.trim() : openaiApiKey.trim(),
+          copyAppName.trim(),
+          copyDescription.trim(),
+          featureText,
+          copySegment.trim() || 'app users'
+        );
+
+        const copyData: CopyData = { ...generated, appName: copyAppName.trim() };
+
+        // Render phone + iPad variants simultaneously
+        const [phoneBlob, ipadBlob] = await Promise.all([
+          renderCopyDesign(dataUrl, phoneSpec, copyData),
+          renderCopyDesign(dataUrl, ipadSpec, copyData),
+        ]);
+
+        processedItems.push({
+          id: crypto.randomUUID(),
+          platform: Platform.APPLE,
+          exportMode: ExportMode.RECTANGLE,
+          index: currentTrayCount + i + 1,
+          timestamp: Date.now(),
+          frameColor: '#F5EDE0',
+          variants: [
+            { deviceType: appleDevice,     renderedImageUrl: URL.createObjectURL(phoneBlob), renderedBlob: phoneBlob, filename: phoneFilename },
+            { deviceType: DeviceType.IPAD, renderedImageUrl: URL.createObjectURL(ipadBlob),  renderedBlob: ipadBlob,  filename: ipadFilename  },
+          ],
+        });
+
+        setBatchProgress(i + 1);
+      }
+
+      setState(prev => {
+        const newTray = [...prev.tray];
+        for (const item of processedItems) {
+          const slot = newTray.findIndex(s => s === null);
+          if (slot !== -1) newTray[slot] = item;
+        }
+        return { ...prev, tray: newTray, activeView: AppView.TRAY };
+      });
+
+      if (filesToLock.length > 0) {
+        const nextSeq = currentTrayCount + filesToProcess.length;
+        setTrayLockedFiles(filesToLock.map((f, i) => ({
+          name: f.name,
+          seq: String(nextSeq + i + 1).padStart(2, '0'),
+          slotName: category.slots[filesToProcess.length + i] ?? `screenshot_${filesToProcess.length + i + 1}`,
+        })));
+      }
+
+      setAppleFiles([]);
+    } catch (err) {
+      console.error('Copy design process error:', err);
+      showAlert('Processing Error', err instanceof Error ? err.message : 'Failed to generate designed screenshots. Check your API key and try again.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const handleAppleQuickProcess = async () => {
+    if (appleFiles.length === 0 || isProcessingBatch) return;
+
+    if (outputMode === OutputMode.COPY_DESIGN) {
+      return handleCopyDesignProcess();
+    }
+
+    const currentTrayCount = state.tray.filter(x => x !== null).length;
+    const emptySlots       = state.tray.filter(s => s === null).length;
+    const isFree           = !auth.user || !state.isPro;
+    const FREE_LIMIT       = 1;
+    const canProcess       = isFree ? Math.max(0, FREE_LIMIT - currentTrayCount) : emptySlots;
+
+    if (emptySlots === 0) {
+      showAlert('Tray Full', 'All 8 slots are occupied. Remove an item from the tray first.');
+      return;
+    }
+
+    if (canProcess === 0) { showUpgradeModal(); return; }
+
+    const filesToProcess = appleFiles.slice(0, canProcess);
+    const filesToLock    = isFree ? appleFiles.slice(canProcess) : [];
+
+    setIsProcessingBatch(true);
+    setBatchProgress(0);
+
+    const phoneSpec = DEVICE_SPECS[appleDevice];
+    const ipadSpec  = DEVICE_SPECS[DeviceType.IPAD];
+    const category  = APPLE_CATEGORIES[appleCategory];
+    const processedItems: TrayItem[] = [];
+
+    try {
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file = filesToProcess[i];
+        const slotName = category.slots[i] ?? `screenshot_${i + 1}`;
+        const seq = String(currentTrayCount + i + 1).padStart(2, '0');
+        const phoneFilename = `${seq}_${slotName}.png`;
+        const ipadFilename  = `${seq}_${slotName}_ipad.png`;
+
+        const dataUrl = await fileToDataUrl(file);
+
+        // Process for iPhone (selected size) and iPad (always generated)
+        const [phoneBlob, ipadBlob] = await Promise.all([
+          processAppleQuick(dataUrl, phoneSpec),
+          processAppleQuick(dataUrl, ipadSpec)
+        ]);
+
+        processedItems.push({
+          id: crypto.randomUUID(),
+          platform: Platform.APPLE,
+          exportMode: ExportMode.RECTANGLE,
+          index: currentTrayCount + i + 1,
+          timestamp: Date.now(),
+          frameColor: '#1a1a1a',
+          variants: [
+            { deviceType: appleDevice,      renderedImageUrl: URL.createObjectURL(phoneBlob), renderedBlob: phoneBlob, filename: phoneFilename },
+            { deviceType: DeviceType.IPAD,  renderedImageUrl: URL.createObjectURL(ipadBlob),  renderedBlob: ipadBlob,  filename: ipadFilename  }
+          ]
+        });
+
+        setBatchProgress(i + 1);
+      }
+
+      setState(prev => {
+        const newTray = [...prev.tray];
+        for (const item of processedItems) {
+          const slot = newTray.findIndex(s => s === null);
+          if (slot !== -1) newTray[slot] = item;
+        }
+        return { ...prev, tray: newTray, activeView: AppView.TRAY };
+      });
+
+      if (filesToLock.length > 0) {
+        const nextSeq = currentTrayCount + filesToProcess.length;
+        setTrayLockedFiles(filesToLock.map((f, i) => ({
+          name: f.name,
+          seq: String(nextSeq + i + 1).padStart(2, '0'),
+          slotName: category.slots[filesToProcess.length + i] ?? `screenshot_${filesToProcess.length + i + 1}`,
+        })));
+      }
+
+      setAppleFiles([]);
+    } catch (err) {
+      console.error('Apple quick-process error:', err);
+      showAlert('Processing Error', 'One or more screenshots could not be processed. Check the files and try again.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  const handleAndroidProcess = async () => {
+    if (androidFiles.length === 0 || isProcessingBatch) return;
+
+    const currentTrayCount = state.tray.filter(x => x !== null).length;
+    const emptySlots       = state.tray.filter(s => s === null).length;
+    const isFree           = !auth.user || !state.isPro;
+    const FREE_LIMIT       = 1;
+    const canProcess       = isFree ? Math.max(0, FREE_LIMIT - currentTrayCount) : emptySlots;
+
+    if (emptySlots === 0) {
+      showAlert('Tray Full', 'All 8 slots are occupied. Remove an item from the tray first.');
+      return;
+    }
+
+    if (canProcess === 0) { showUpgradeModal(); return; }
+
+    const filesToProcess = androidFiles.slice(0, canProcess);
+    const filesToLock    = isFree ? androidFiles.slice(canProcess) : [];
+
+    setIsProcessingBatch(true);
+    setBatchProgress(0);
+
+    const phoneSpec   = DEVICE_SPECS[DeviceType.PHONE];
+    const tablet10Spec = DEVICE_SPECS[DeviceType.TABLET_10];
+    const tablet7Spec  = DEVICE_SPECS[DeviceType.TABLET_7];
+    const category    = APPLE_CATEGORIES[androidCategory];
+    const processedItems: TrayItem[] = [];
+
+    if (outputMode === OutputMode.COPY_DESIGN) {
+      const activeKey = aiProvider === 'claude' ? claudeApiKey.trim() : openaiApiKey.trim();
+      if (!activeKey) {
+        showAlert('Missing API Key', 'Please enter your API key to use Copy Design mode.');
+        setIsProcessingBatch(false);
+        return;
+      }
+      if (!copyAppName.trim()) {
+        showAlert('Missing App Name', 'Please enter your app name.');
+        setIsProcessingBatch(false);
+        return;
+      }
+      if (!copyDescription.trim()) {
+        showAlert('Missing Description', 'Please describe your app.');
+        setIsProcessingBatch(false);
+        return;
+      }
+    }
+
+    try {
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file     = filesToProcess[i];
+        const slotName = category.slots[i] ?? `screenshot_${i + 1}`;
+        const seq      = String(currentTrayCount + i + 1).padStart(2, '0');
+        const dataUrl  = await fileToDataUrl(file);
+
+        let phoneBlob: Blob;
+        let tablet10Blob: Blob;
+        let tablet7Blob: Blob;
+
+        if (outputMode === OutputMode.COPY_DESIGN) {
+          // Generate copy via AI provider, render designed screenshot for each spec independently.
+          // All three render from the same original dataUrl so no double-crop occurs.
+          const featureText = copyFeatures[i]?.trim() || slotName.replace(/_/g, ' ');
+          const generated = await generateCopy(
+            aiProvider,
+            aiProvider === 'claude' ? claudeApiKey.trim() : openaiApiKey.trim(),
+            copyAppName.trim(),
+            copyDescription.trim(),
+            featureText,
+            copySegment.trim() || 'app users'
+          );
+          const copyData: CopyData = { ...generated, appName: copyAppName.trim() };
+          [phoneBlob, tablet10Blob, tablet7Blob] = await Promise.all([
+            renderCopyDesign(dataUrl, phoneSpec, copyData),
+            renderCopyDesign(dataUrl, tablet10Spec, copyData),
+            renderCopyDesign(dataUrl, tablet7Spec, copyData),
+          ]);
+        } else {
+          // Full Resolution: all three specs process directly from the original source.
+          // Do NOT chain tablets off the phone blob — that causes a double bar-crop which
+          // removes app content on the phone and leaves residual bars.
+          [phoneBlob, tablet10Blob, tablet7Blob] = await Promise.all([
+            processAndroidQuick(dataUrl, phoneSpec),
+            processAndroidQuick(dataUrl, tablet10Spec),
+            processAndroidQuick(dataUrl, tablet7Spec),
+          ]);
+        }
+
+        const suffix = outputMode === OutputMode.COPY_DESIGN ? '_designed' : '';
+        processedItems.push({
+          id: crypto.randomUUID(),
+          platform: Platform.ANDROID,
+          exportMode: ExportMode.RECTANGLE,
+          index: currentTrayCount + i + 1,
+          timestamp: Date.now(),
+          frameColor: outputMode === OutputMode.COPY_DESIGN ? '#F5EDE0' : '#1a1a1a',
+          variants: [
+            { deviceType: DeviceType.PHONE,     renderedImageUrl: URL.createObjectURL(phoneBlob),    renderedBlob: phoneBlob,    filename: `${seq}_${slotName}_android_phone${suffix}.png`  },
+            { deviceType: DeviceType.TABLET_10, renderedImageUrl: URL.createObjectURL(tablet10Blob), renderedBlob: tablet10Blob, filename: `${seq}_${slotName}_android_tablet${suffix}.png`  },
+            { deviceType: DeviceType.TABLET_7,  renderedImageUrl: URL.createObjectURL(tablet7Blob),  renderedBlob: tablet7Blob,  filename: `${seq}_${slotName}_android_7in${suffix}.png`     },
+          ],
+        });
+
+        setBatchProgress(i + 1);
+      }
+
+      setState(prev => {
+        const newTray = [...prev.tray];
+        for (const item of processedItems) {
+          const slot = newTray.findIndex(s => s === null);
+          if (slot !== -1) newTray[slot] = item;
+        }
+        return { ...prev, tray: newTray, activeView: AppView.TRAY };
+      });
+
+      if (filesToLock.length > 0) {
+        const nextSeq = currentTrayCount + filesToProcess.length;
+        setTrayLockedFiles(filesToLock.map((f, i) => ({
+          name: f.name,
+          seq: String(nextSeq + i + 1).padStart(2, '0'),
+          slotName: category.slots[filesToProcess.length + i] ?? `screenshot_${filesToProcess.length + i + 1}`,
+        })));
+      }
+
+      setAndroidFiles([]);
+    } catch (err) {
+      console.error('Android process error:', err);
+      showAlert('Processing Error', 'One or more screenshots could not be processed. Check the files and try again.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
   };
 
   const AdjustmentSlider = ({ label, value, min, max, property }: { label: string, value: number, min: number, max: number, property: keyof ImageAdjustments }) => (
@@ -786,6 +1297,18 @@ const App: React.FC = () => {
         </header>
 
         <nav className="flex flex-col bg-zinc-950 p-1 rounded-2xl border border-zinc-800 gap-1">
+          <button
+            onClick={() => setState(prev => ({ ...prev, activeView: AppView.APPLE }))}
+            className={`w-full py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.APPLE ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            APPLE STUDIO
+          </button>
+          <button
+            onClick={() => setState(prev => ({ ...prev, activeView: AppView.ANDROID }))}
+            className={`w-full py-2 text-[10px] font-black rounded-xl transition-all ${state.activeView === AppView.ANDROID ? 'bg-green-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            ANDROID STUDIO
+          </button>
           <div className="flex gap-1">
             <button
               onClick={() => setState(prev => ({ ...prev, activeView: AppView.EDITOR }))}
@@ -841,6 +1364,341 @@ const App: React.FC = () => {
             onScroll={checkSettingsScroll}
             className="h-full overflow-y-auto px-6 py-5 flex flex-col gap-6 scrollbar-hide"
           >
+
+        {state.activeView === AppView.APPLE && (
+          <>
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">iPhone Size</label>
+              <div className="flex flex-col gap-2">
+                {([
+                  { type: DeviceType.IPHONE_65, label: 'iPhone 6.5"', sub: '1284 × 2778' },
+                  { type: DeviceType.IPHONE,    label: 'iPhone 6.9"', sub: '1260 × 2736' },
+                ] as const).map(({ type, label, sub }) => (
+                  <button
+                    key={type}
+                    onClick={() => setAppleDevice(type)}
+                    className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all ${
+                      appleDevice === type
+                        ? 'bg-blue-600/20 border-blue-500 text-white'
+                        : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+                    <span className="text-[9px] font-mono text-zinc-500">{sub}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/60 shrink-0"></div>
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">
+                  iPad Pro 12.9" always generated alongside iPhone
+                </p>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">App Category</label>
+              <select
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 appearance-none"
+                value={appleCategory}
+                onChange={(e) => setAppleCategory(e.target.value as AppleCategory)}
+              >
+                {(Object.entries(APPLE_CATEGORIES) as [AppleCategory, typeof APPLE_CATEGORIES[AppleCategory]][]).map(([key, cat]) => (
+                  <option key={key} value={key}>{cat.label}</option>
+                ))}
+              </select>
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-relaxed">
+                Sets screenshot order and store-ready file names
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Output Type</label>
+              <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                <button
+                  onClick={() => setOutputMode(OutputMode.FULL_RES)}
+                  className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${outputMode === OutputMode.FULL_RES ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Full Resolution
+                </button>
+                <button
+                  onClick={() => setOutputMode(OutputMode.COPY_DESIGN)}
+                  className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${outputMode === OutputMode.COPY_DESIGN ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Copy Design
+                </button>
+              </div>
+            </section>
+
+            {outputMode === OutputMode.COPY_DESIGN && (
+              <>
+                <section className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">App Details</label>
+                  <input
+                    type="text"
+                    placeholder="App Name"
+                    value={copyAppName}
+                    maxLength={80}
+                    onChange={e => setCopyAppName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-blue-500 transition-colors"
+                  />
+                  <textarea
+                    placeholder="Describe what your app does..."
+                    value={copyDescription}
+                    maxLength={400}
+                    onChange={e => setCopyDescription(e.target.value)}
+                    rows={3}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-blue-500 transition-colors resize-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Target segment (e.g. busy professionals)"
+                    value={copySegment}
+                    maxLength={80}
+                    onChange={e => setCopySegment(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-blue-500 transition-colors"
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">AI Provider</label>
+                  <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                    <button
+                      onClick={() => setAiProvider('claude')}
+                      className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${aiProvider === 'claude' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                      Claude
+                    </button>
+                    <button
+                      onClick={() => setAiProvider('openai')}
+                      className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${aiProvider === 'openai' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                      OpenAI
+                    </button>
+                  </div>
+                  {aiProvider === 'claude' ? (
+                    <input
+                      type="password"
+                      placeholder="sk-ant-..."
+                      value={claudeApiKey}
+                      onChange={e => setClaudeApiKey(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-blue-500 transition-colors"
+                    />
+                  ) : (
+                    <input
+                      type="password"
+                      placeholder="sk-..."
+                      value={openaiApiKey}
+                      onChange={e => setOpenaiApiKey(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors"
+                    />
+                  )}
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-relaxed">
+                    Key stays in your browser — never sent to ScreenFrame servers
+                  </p>
+                </section>
+              </>
+            )}
+
+            <button
+              disabled={appleFiles.length === 0 || isProcessingBatch}
+              onClick={handleAppleQuickProcess}
+              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl border border-blue-500/40 bg-blue-600/10 text-blue-500 hover:bg-blue-600/20 transition-all disabled:opacity-30 shadow-lg shadow-blue-500/5 ${isProcessingBatch ? 'animate-pulse' : ''}`}
+            >
+              {isProcessingBatch ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {batchProgress} / {appleFiles.length}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {appleFiles.length > 0
+                      ? outputMode === OutputMode.COPY_DESIGN
+                        ? `Generate ${appleFiles.length} → iPhone + iPad`
+                        : `Process ${appleFiles.length} → iPhone + iPad`
+                      : 'Process Screenshots'}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {!state.isPro && (
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center">
+                {`Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
+              </p>
+            )}
+          </>
+        )}
+
+        {state.activeView === AppView.ANDROID && (
+          <>
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Output Sizes</label>
+              <div className="space-y-2">
+                {([
+                  { label: 'Phone',       sub: '1080 × 1920' },
+                  { label: '10″ Tablet',  sub: '800 × 1280' },
+                  { label: '7″ Tablet',   sub: '600 × 1024' },
+                ] as const).map(({ label, sub }) => (
+                  <div key={label} className="flex items-center justify-between px-4 py-2.5 rounded-2xl border border-zinc-800 bg-zinc-900/50">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">{label}</span>
+                    <span className="text-[9px] font-mono text-zinc-500">{sub}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500/60 shrink-0"></div>
+                <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">
+                  All 3 sizes generated from each upload
+                </p>
+              </div>
+            </section>
+
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">App Category</label>
+              <select
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 appearance-none"
+                value={androidCategory}
+                onChange={(e) => setAndroidCategory(e.target.value as AppleCategory)}
+              >
+                {(Object.entries(APPLE_CATEGORIES) as [AppleCategory, typeof APPLE_CATEGORIES[AppleCategory]][]).map(([key, cat]) => (
+                  <option key={key} value={key}>{cat.label}</option>
+                ))}
+              </select>
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-relaxed">
+                Sets screenshot order and store-ready file names
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Output Type</label>
+              <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                <button
+                  onClick={() => setOutputMode(OutputMode.FULL_RES)}
+                  className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${outputMode === OutputMode.FULL_RES ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Full Resolution
+                </button>
+                <button
+                  onClick={() => setOutputMode(OutputMode.COPY_DESIGN)}
+                  className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${outputMode === OutputMode.COPY_DESIGN ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  Copy Design
+                </button>
+              </div>
+            </section>
+
+            {outputMode === OutputMode.COPY_DESIGN && (
+              <>
+                <section className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">App Details</label>
+                  <input
+                    type="text"
+                    placeholder="App Name"
+                    value={copyAppName}
+                    maxLength={80}
+                    onChange={e => setCopyAppName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors"
+                  />
+                  <textarea
+                    placeholder="Describe what your app does..."
+                    value={copyDescription}
+                    maxLength={400}
+                    onChange={e => setCopyDescription(e.target.value)}
+                    rows={3}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors resize-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Target segment (e.g. busy professionals)"
+                    value={copySegment}
+                    maxLength={80}
+                    onChange={e => setCopySegment(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors"
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">AI Provider</label>
+                  <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
+                    <button
+                      onClick={() => setAiProvider('claude')}
+                      className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${aiProvider === 'claude' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                      Claude
+                    </button>
+                    <button
+                      onClick={() => setAiProvider('openai')}
+                      className={`flex-1 py-2 text-[10px] font-black rounded-lg transition-all ${aiProvider === 'openai' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                      OpenAI
+                    </button>
+                  </div>
+                  {aiProvider === 'claude' ? (
+                    <input
+                      type="password"
+                      placeholder="sk-ant-..."
+                      value={claudeApiKey}
+                      onChange={e => setClaudeApiKey(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors"
+                    />
+                  ) : (
+                    <input
+                      type="password"
+                      placeholder="sk-..."
+                      value={openaiApiKey}
+                      onChange={e => setOpenaiApiKey(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs font-bold text-zinc-300 outline-none focus:border-green-500 transition-colors"
+                    />
+                  )}
+                  <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest leading-relaxed">
+                    Key stays in your browser — never sent to ScreenFrame servers
+                  </p>
+                </section>
+              </>
+            )}
+
+            <button
+              disabled={androidFiles.length === 0 || isProcessingBatch}
+              onClick={handleAndroidProcess}
+              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl border border-green-600/40 bg-green-700/10 text-green-500 hover:bg-green-700/20 transition-all disabled:opacity-30 shadow-lg shadow-green-500/5 ${isProcessingBatch ? 'animate-pulse' : ''}`}
+            >
+              {isProcessingBatch ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {batchProgress} / {androidFiles.length}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                  </svg>
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {androidFiles.length > 0
+                      ? outputMode === OutputMode.COPY_DESIGN
+                        ? `Generate ${androidFiles.length} → Phone + Tablets`
+                        : `Process ${androidFiles.length} → Phone + Tablets`
+                      : 'Process Screenshots'}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {!state.isPro && (
+              <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest text-center">
+                {`Free Tier • ${state.tray.filter(x => x !== null).length}/1 Used`}
+              </p>
+            )}
+          </>
+        )}
 
         {state.activeView === AppView.EDITOR && (
           <>
@@ -988,6 +1846,50 @@ const App: React.FC = () => {
         {state.activeView === AppView.TRAY && (
           <div className="space-y-6">
             <section className="space-y-3">
+              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Apple Preview</label>
+              <div className="flex gap-1 bg-zinc-900 rounded-xl p-1">
+                <button
+                  onClick={() => setTrayPreview('phone')}
+                  className={`flex-1 py-2.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${trayPreview === 'phone' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  iPhone
+                </button>
+                <button
+                  onClick={() => setTrayPreview('ipad')}
+                  className={`flex-1 py-2.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${trayPreview === 'ipad' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                >
+                  iPad
+                </button>
+              </div>
+            </section>
+
+            {hasAndroid && (
+              <section className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Android Preview</label>
+                <div className="flex gap-1 bg-zinc-900 rounded-xl p-1">
+                  <button
+                    onClick={() => setAndroidTrayPreview('phone')}
+                    className={`flex-1 py-2 text-[9px] font-black rounded-lg transition-all uppercase tracking-widest ${androidTrayPreview === 'phone' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Phone
+                  </button>
+                  <button
+                    onClick={() => setAndroidTrayPreview('10in')}
+                    className={`flex-1 py-2 text-[9px] font-black rounded-lg transition-all uppercase tracking-widest ${androidTrayPreview === '10in' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    10″
+                  </button>
+                  <button
+                    onClick={() => setAndroidTrayPreview('7in')}
+                    className={`flex-1 py-2 text-[9px] font-black rounded-lg transition-all uppercase tracking-widest ${androidTrayPreview === '7in' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    7″
+                  </button>
+                </div>
+              </section>
+            )}
+
+            <section className="space-y-3">
               <label className="text-[10px] font-black uppercase text-zinc-500 tracking-wider">Project Management</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -1015,16 +1917,32 @@ const App: React.FC = () => {
                 onClick={() => handleBatchExport(Platform.APPLE)}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasApple ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-white text-black hover:bg-zinc-100 active:scale-95 shadow-xl'}`}
               >
-                {isExporting === Platform.APPLE ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
+                {isExporting === Platform.APPLE
+                  ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                  : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
                 EXPORT APPLE KIT
               </button>
               <button
                 disabled={!hasAndroid || !!isExporting}
                 onClick={() => handleBatchExport(Platform.ANDROID)}
-                className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasAndroid ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-zinc-800 text-white hover:bg-zinc-700 active:scale-95 shadow-md shadow-black/50'}`}
+                className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black transition-all ${!hasAndroid ? 'bg-zinc-900 text-zinc-700 cursor-not-allowed opacity-50' : 'bg-green-700 text-white hover:bg-green-600 active:scale-95 shadow-xl'}`}
               >
-                {isExporting === Platform.ANDROID ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
+                {isExporting === Platform.ANDROID
+                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>}
                 EXPORT ANDROID KIT
+              </button>
+              <button
+                disabled={state.tray.every(s => s === null) || !!isExporting}
+                onClick={() => showConfirm(
+                  'Clear Tray',
+                  'Remove all screenshots from the tray? This cannot be undone.',
+                  () => { setState(prev => ({ ...prev, tray: Array(8).fill(null) })); setTrayLockedFiles([]); }
+                )}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-black transition-all text-[10px] uppercase tracking-widest border border-red-500/30 bg-red-600/10 text-red-500 hover:bg-red-600/20 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                CLEAR TRAY
               </button>
             </div>
           </div>
@@ -1086,6 +2004,200 @@ const App: React.FC = () => {
       </aside>
 
       <main className={`flex-1 relative flex flex-col items-center justify-center ${isCropMode ? 'p-0 overflow-hidden' : 'p-4 md:p-8 overflow-y-auto'} bg-[#0d0d0d]`}>
+
+        {state.activeView === AppView.APPLE && (
+          <div className="w-full h-full max-w-2xl flex flex-col items-center justify-start pt-10 px-4 md:px-8 overflow-y-auto scrollbar-hide">
+            <div className="w-full mb-6">
+              <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic leading-none mb-2">
+                Apple Screenshot Studio
+              </h2>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">
+                Upload → Auto-process → Tray → Export
+              </p>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              className={`w-full border-2 border-dashed rounded-[2rem] p-10 text-center transition-all cursor-pointer ${
+                appleFiles.length > 0
+                  ? 'border-zinc-700 bg-zinc-900/30 hover:border-zinc-600'
+                  : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/20'
+              }`}
+              onClick={() => appleFileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                setAppleFiles(prev => [...prev, ...files].slice(0, 8));
+              }}
+            >
+              <input
+                type="file"
+                ref={appleFileInputRef}
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith('image/'));
+                  setAppleFiles(prev => [...prev, ...files].slice(0, 8));
+                  e.target.value = '';
+                }}
+              />
+              {appleFiles.length === 0 ? (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-zinc-800/50 flex items-center justify-center mx-auto mb-6 text-zinc-600">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-black uppercase italic tracking-tight mb-2">Drop Screenshots Here</p>
+                  <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Up to 8 · PNG or JPG · Max 8 MB each</p>
+                </>
+              ) : (
+                <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest">+ Add More (click or drop)</p>
+              )}
+            </div>
+
+            {/* File list with preview names */}
+            {appleFiles.length > 0 && (
+              <div className="w-full mt-4 space-y-2">
+                {appleFiles.map((file, i) => {
+                  const cat = APPLE_CATEGORIES[appleCategory];
+                  const slotName = cat.slots[i] ?? `screenshot_${i + 1}`;
+                  const seq = String(state.tray.filter(x => x !== null).length + i + 1).padStart(2, '0');
+                  const isIpad = appleDevice === DeviceType.IPAD;
+                  const outputName = `${seq}_${slotName}${isIpad ? '_ipad' : ''}.png`;
+
+                  return (
+                    <div key={i} className="flex flex-col px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-[10px] font-mono text-blue-400 shrink-0">{seq}</span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{outputName}</p>
+                            <p className="text-[9px] text-zinc-600 font-bold truncate">{file.name}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAppleFiles(prev => prev.filter((_, idx) => idx !== i)); }}
+                          className="p-1.5 text-zinc-600 hover:text-red-500 transition-colors shrink-0"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                        </button>
+                      </div>
+                      {outputMode === OutputMode.COPY_DESIGN && (
+                        <input
+                          type="text"
+                          placeholder={`What does this screen show? (e.g. ${slotName.replace(/_/g, ' ')})`}
+                          value={copyFeatures[i] ?? ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCopyFeatures(prev => {
+                              const next = [...prev];
+                              next[i] = val;
+                              return next;
+                            });
+                          }}
+                          onClick={e => e.stopPropagation()}
+                          className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-[9px] font-bold text-zinc-300 outline-none focus:border-blue-500 transition-colors"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {state.activeView === AppView.ANDROID && (
+          <div className="w-full h-full max-w-2xl flex flex-col items-center justify-start pt-10 px-4 md:px-8 overflow-y-auto scrollbar-hide">
+            <div className="w-full mb-6">
+              <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic leading-none mb-2">
+                Android Screenshot Studio
+              </h2>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">
+                Upload → Auto-process → Tray → Export
+              </p>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              className={`w-full border-2 border-dashed rounded-[2rem] p-10 text-center transition-all cursor-pointer ${
+                androidFiles.length > 0
+                  ? 'border-zinc-700 bg-zinc-900/30 hover:border-zinc-600'
+                  : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/20'
+              }`}
+              onClick={() => androidFileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                setAndroidFiles(prev => [...prev, ...files].slice(0, 8));
+              }}
+            >
+              <input
+                type="file"
+                ref={androidFileInputRef}
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter(f => f.type.startsWith('image/'));
+                  setAndroidFiles(prev => [...prev, ...files].slice(0, 8));
+                  e.target.value = '';
+                }}
+              />
+              {androidFiles.length === 0 ? (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-zinc-800/50 flex items-center justify-center mx-auto mb-6 text-zinc-600">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                  </div>
+                  <p className="text-white text-sm font-black uppercase italic tracking-tight mb-2">Drop Screenshots Here</p>
+                  <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Up to 8 · PNG or JPG · Android or Apple source accepted</p>
+                </>
+              ) : (
+                <p className="text-zinc-400 text-[10px] font-black uppercase tracking-widest">+ Add More (click or drop)</p>
+              )}
+            </div>
+
+            {/* File list */}
+            {androidFiles.length > 0 && (
+              <div className="w-full mt-4 space-y-2">
+                {androidFiles.map((file, i) => {
+                  const cat = APPLE_CATEGORIES[androidCategory];
+                  const slotName = cat.slots[i] ?? `screenshot_${i + 1}`;
+                  const seq = String(state.tray.filter(x => x !== null).length + i + 1).padStart(2, '0');
+
+                  return (
+                    <div key={i} className="flex items-center justify-between px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-2xl gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[10px] font-mono text-green-400 shrink-0">{seq}</span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-white uppercase tracking-widest truncate">{seq}_{slotName}_android_*.png</p>
+                          <p className="text-[9px] text-zinc-600 font-bold truncate">{file.name}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setAndroidFiles(prev => prev.filter((_, idx) => idx !== i)); }}
+                        className="p-1.5 text-zinc-600 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {state.activeView === AppView.EDITOR && (
           <>
             {!state.image && (
@@ -1159,7 +2271,7 @@ const App: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {state.tray.map((item, idx) => {
-                const primaryVariant = item?.variants[0];
+                const primaryVariant = item ? getPreviewVariant(item) : undefined;
                 const isBeingDragged = draggedSlotIdx === idx;
                 const isDropTarget = dropTargetIdx === idx && draggedSlotIdx !== idx;
 
@@ -1207,6 +2319,48 @@ const App: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* ── Locked slots (free-tier overflow) ── */}
+            {trayLockedFiles.length > 0 && (
+              <div className="mt-8 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-zinc-800" />
+                  <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Locked — Upgrade to Process</span>
+                  <div className="h-px flex-1 bg-zinc-800" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {trayLockedFiles.map((locked) => (
+                    <div
+                      key={locked.seq}
+                      className="relative aspect-[9/16] bg-zinc-950 border border-zinc-800/50 rounded-[2.5rem] flex flex-col items-center justify-center overflow-hidden"
+                    >
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 gap-3">
+                        <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                          <svg className="w-7 h-7 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div className="text-center space-y-1 px-2">
+                          <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest truncate max-w-full">{locked.seq} · {locked.slotName.replace(/_/g, ' ')}</p>
+                          <p className="text-[8px] text-zinc-700 font-medium truncate max-w-full">{locked.name}</p>
+                        </div>
+                        <button
+                          onClick={() => showUpgradeModal()}
+                          className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-[8px] font-black uppercase tracking-widest rounded-xl transition-colors shadow-lg shadow-blue-500/20"
+                        >
+                          Upgrade to Unlock
+                        </button>
+                      </div>
+                      <div className="absolute top-6 left-6 w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                        <svg className="w-3 h-3 text-zinc-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
